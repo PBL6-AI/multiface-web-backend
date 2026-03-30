@@ -1,0 +1,26 @@
+export * from './auth-user';
+export * from './user-profile';
+
+export * from './appeal.raw-entity';
+export * from './attendance-record.raw-entity';
+export * from './attendance-session.raw-entity';
+export * from './class-member.raw-entity';
+export * from './class-schedule.raw-entity';
+export * from './class.raw-entity';
+export * from './department.raw-entity';
+export * from './face-embedding.raw-entity';
+export * from './face-image.raw-entity';
+export * from './face-registration-request.raw-entity';
+export * from './file.raw-entity';
+export * from './leave-request.raw-entity';
+export * from './notification.raw-entity';
+export * from './permission.raw-entity';
+export * from './recognition-event.raw-entity';
+export * from './refresh-token.raw-entity';
+export * from './role-permission.raw-entity';
+export * from './role.raw-entity';
+export * from './specialization.raw-entity';
+export * from './unknown-face.raw-entity';
+export * from './user.raw-entity';
+
+export type { RawEntity } from './raw-entity.type';

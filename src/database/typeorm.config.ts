@@ -1,19 +1,17 @@
 ﻿import { TypeOrmModuleAsyncOptions } from '@nestjs/typeorm';
-import databaseConfig from '../config/database.config';
+import { ConfigService } from '@nestjs/config';
 
 export const typeOrmConfig: TypeOrmModuleAsyncOptions = {
-  useFactory: () => {
-    const db = databaseConfig();
-
+  useFactory: (configService: ConfigService) => {
     return {
       type: 'postgres',
-      host: db.host,
-      port: db.port,
-      username: db.username,
-      password: db.password,
-      database: db.database,
+      host: configService.get<string>('db.host'),
+      port: configService.get<number>('db.port'),
+      username: configService.get<string>('db.username'),
+      password: configService.get<string>('db.password'),
+      database: configService.get<string>('db.database'),
       autoLoadEntities: true,
-      synchronize: db.synchronize,
+      synchronize: configService.get<boolean>('db.synchronize'),
     };
   },
 };

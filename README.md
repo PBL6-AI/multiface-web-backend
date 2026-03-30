@@ -1,98 +1,163 @@
-<p align="center">
-  <a href="http://nestjs.com/" target="blank"><img src="https://nestjs.com/img/logo-small.svg" width="120" alt="Nest Logo" /></a>
-</p>
+# Multiface Web Backend
 
-[circleci-image]: https://img.shields.io/circleci/build/github/nestjs/nest/master?token=abc123def456
-[circleci-url]: https://circleci.com/gh/nestjs/nest
+Backend cho hệ thống điểm danh khuôn mặt (Multiface), xây dựng bằng NestJS theo định hướng Clean Architecture + Feature Modules + Event-Driven.
 
-  <p align="center">A progressive <a href="http://nodejs.org" target="_blank">Node.js</a> framework for building efficient and scalable server-side applications.</p>
-    <p align="center">
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/v/@nestjs/core.svg" alt="NPM Version" /></a>
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/l/@nestjs/core.svg" alt="Package License" /></a>
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/dm/@nestjs/common.svg" alt="NPM Downloads" /></a>
-<a href="https://circleci.com/gh/nestjs/nest" target="_blank"><img src="https://img.shields.io/circleci/build/github/nestjs/nest/master" alt="CircleCI" /></a>
-<a href="https://discord.gg/G7Qnnhy" target="_blank"><img src="https://img.shields.io/badge/discord-online-brightgreen.svg" alt="Discord"/></a>
-<a href="https://opencollective.com/nest#backer" target="_blank"><img src="https://opencollective.com/nest/backers/badge.svg" alt="Backers on Open Collective" /></a>
-<a href="https://opencollective.com/nest#sponsor" target="_blank"><img src="https://opencollective.com/nest/sponsors/badge.svg" alt="Sponsors on Open Collective" /></a>
-  <a href="https://paypal.me/kamilmysliwiec" target="_blank"><img src="https://img.shields.io/badge/Donate-PayPal-ff3f59.svg" alt="Donate us"/></a>
-    <a href="https://opencollective.com/nest#sponsor"  target="_blank"><img src="https://img.shields.io/badge/Support%20us-Open%20Collective-41B883.svg" alt="Support us"></a>
-  <a href="https://twitter.com/nestframework" target="_blank"><img src="https://img.shields.io/twitter/follow/nestframework.svg?style=social&label=Follow" alt="Follow us on Twitter"></a>
-</p>
-  <!--[![Backers on Open Collective](https://opencollective.com/nest/backers/badge.svg)](https://opencollective.com/nest#backer)
-  [![Sponsors on Open Collective](https://opencollective.com/nest/sponsors/badge.svg)](https://opencollective.com/nest#sponsor)-->
+## Mục tiêu
 
-## Description
+- Kiến trúc dễ mở rộng, dễ bảo trì và phù hợp cho tích hợp AI (face embedding/recognition).
+- Tách rõ layer Domain, Application, Infrastructure, Presentation.
+- Từng bước triển khai 10 phân hệ nghiệp vụ theo roadmap.
 
-[Nest](https://github.com/nestjs/nest) framework TypeScript starter repository.
+## Nội dung Đã Verify Từ `setup-plan.md`
 
-## Project setup
+Đối chiếu giữa kế hoạch trong `setup-plan.md` và code hiện tại:
 
-```bash
-$ pnpm install
+- Backend framework `NestJS`: đã có (`package.json`, `src/app.module.ts`).
+- ORM `TypeORM`: đã có (`src/database/typeorm.config.ts`).
+- Database `PostgreSQL + pgvector`: đã có trong `docker-compose.yml` (`pgvector/pgvector:pg16`).
+- Redis cho cache/message broker: đã có service trong `docker-compose.yml`.
+- Global HTTP exception filter: đã cấu hình trong `src/main.ts`.
+- Module hiện có trong app: `auth`, `users`, `faces`.
+- Roadmap 10 modules và strict clean architecture theo từng feature: đang là định hướng triển khai tiếp.
+
+## Technology Stack
+
+- Backend: NestJS
+- ORM: TypeORM
+- Database: PostgreSQL (`pgvector`)
+- Cache / Broker: Redis
+- Runtime: Node.js + pnpm
+- Dev infrastructure: Docker Compose (Postgres + Redis)
+
+## Kiến Trúc Tổng Thể
+
+- Domain Layer: entities/types nghiệp vụ.
+- Application Layer: use cases/services/events chứa business logic.
+- Infrastructure Layer: repository/provider tích hợp DB, Redis, AI service.
+- Presentation Layer: controllers/gateways nhận request từ client.
+
+## Cấu Trúc Hiện Tại (Đã Verify)
+
+```text
+src/
+├── common/
+├── config/
+├── database/
+├── modules/
+│   ├── auth/
+│   ├── faces/
+│   └── users/
+└── packages/
+    ├── ai/
+    ├── domain/
+    ├── infrastructure/
+    ├── messsaging/
+    └── persistence/
 ```
 
-## Compile and run the project
+## Cấu Trúc Mục Tiêu Cho Mỗi Feature Module (Theo Setup Plan)
 
-```bash
-# development
-$ pnpm run start
-
-# watch mode
-$ pnpm run start:dev
-
-# production mode
-$ pnpm run start:prod
+```text
+src/modules/<feature>/
+├── core/             # Domain entities, interfaces, domain exceptions
+├── application/      # Use cases, events
+├── infrastructure/   # Persistence + external integrations
+├── presentation/     # Controllers + DTOs
+└── <feature>.module.ts
 ```
 
-## Run tests
+## Roadmap 10 Feature Modules
 
-```bash
-# unit tests
-$ pnpm run test
+1. `auth` + `users`
+2. `classes`
+3. `faces`
+4. `attendance`
+5. `real-time`
+6. `records`
+7. `exceptions`
+8. `requests`
+9. `notifications`
+10. `admin`
 
-# e2e tests
-$ pnpm run test:e2e
+## Local Setup
 
-# test coverage
-$ pnpm run test:cov
+### 1) Chuẩn bị
+
+- Node.js LTS
+- pnpm
+- Docker + Docker Compose
+
+### 2) Tạo file môi trường
+
+Tạo `.env` từ `.env.example`, sau đó cập nhật giá trị phù hợp:
+
+```env
+DB_HOST=localhost
+DB_PORT=5432
+DB_USERNAME=postgres
+DB_PASSWORD=postgres
+DB_NAME=multiface
+DB_SYNCHRONIZE=true
+PORT=3000
+REDIS_PORT=6379
 ```
 
-## Deployment
-
-When you're ready to deploy your NestJS application to production, there are some key steps you can take to ensure it runs as efficiently as possible. Check out the [deployment documentation](https://docs.nestjs.com/deployment) for more information.
-
-If you are looking for a cloud-based platform to deploy your NestJS application, check out [Mau](https://mau.nestjs.com), our official platform for deploying NestJS applications on AWS. Mau makes deployment straightforward and fast, requiring just a few simple steps:
+### 3) Chạy hạ tầng local (Postgres + Redis)
 
 ```bash
-$ pnpm install -g @nestjs/mau
-$ mau deploy
+docker compose up -d postgres redis
 ```
 
-With Mau, you can deploy your application in just a few clicks, allowing you to focus on building features rather than managing infrastructure.
+### 4) Cài dependencies và chạy backend
 
-## Resources
+```bash
+pnpm install
+pnpm run start:dev
+```
 
-Check out a few resources that may come in handy when working with NestJS:
+API mặc định chạy ở `http://localhost:3000` (hoặc theo `PORT`).
 
-- Visit the [NestJS Documentation](https://docs.nestjs.com) to learn more about the framework.
-- For questions and support, please visit our [Discord channel](https://discord.gg/G7Qnnhy).
-- To dive deeper and get more hands-on experience, check out our official video [courses](https://courses.nestjs.com/).
-- Deploy your application to AWS with the help of [NestJS Mau](https://mau.nestjs.com) in just a few clicks.
-- Visualize your application graph and interact with the NestJS application in real-time using [NestJS Devtools](https://devtools.nestjs.com).
-- Need help with your project (part-time to full-time)? Check out our official [enterprise support](https://enterprise.nestjs.com).
-- To stay in the loop and get updates, follow us on [X](https://x.com/nestframework) and [LinkedIn](https://linkedin.com/company/nestjs).
-- Looking for a job, or have a job to offer? Check out our official [Jobs board](https://jobs.nestjs.com).
+## Scripts
 
-## Support
+```bash
+# build
+pnpm run build
 
-Nest is an MIT-licensed open source project. It can grow thanks to the sponsors and support by the amazing backers. If you'd like to join them, please [read more here](https://docs.nestjs.com/support).
+# start
+pnpm run start
+pnpm run start:dev
+pnpm run start:debug
+pnpm run start:prod
 
-## Stay in touch
+# lint & format
+pnpm run lint
+pnpm run format
 
-- Author - [Kamil Myśliwiec](https://twitter.com/kammysliwiec)
-- Website - [https://nestjs.com](https://nestjs.com/)
-- Twitter - [@nestframework](https://twitter.com/nestframework)
+# tests
+pnpm run test
+pnpm run test:watch
+pnpm run test:cov
+pnpm run test:e2e
+```
 
-## License
+## NestJS Best Practices (Áp Dụng Theo Kế Hoạch)
 
-Nest is [MIT licensed](https://github.com/nestjs/nest/blob/master/LICENSE).
+- Tránh circular dependency, ưu tiên event cho luồng nghiệp vụ liên module.
+- Dùng repository pattern để dễ test/mock.
+- Bảo mật theo RBAC (`Admin`, `Teacher`, `Student`) + validate input bằng `class-validator`.
+- Dùng Redis cache/queue cho các tác vụ nặng hoặc bất đồng bộ.
+- Chuẩn hóa lỗi với global exception filter.
+
+## Verification Plan (Gộp Từ Setup Plan)
+
+1. Duyệt kiến trúc và xác nhận thiết kế.
+2. Scaffold các module/controller/service theo cấu trúc chuẩn.
+3. Viết mock integration/e2e để kiểm tra wiring giữa các layer.
+
+## Tài Liệu Liên Quan
+
+- `setup-plan.md`
+- `docs/db/db-design.md`
+- `docs/api/api-doc.md`
+- `docs/dev/coding-convention.md`
+- `docs/dev/git-flow.md`

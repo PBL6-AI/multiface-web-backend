@@ -3,24 +3,37 @@ services:
     image: pgvector/pgvector:pg16
     container_name: multiface-postgres
     environment:
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: postgres
-      POSTGRES_DB: multiface
+      POSTGRES_USER: ${DB_USERNAME}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+      POSTGRES_DB: ${DB_NAME}
     ports:
       - '${DB_PORT}:5432'
     volumes:
       - multiface_web_data:/var/lib/postgresql/data
     healthcheck:
-      test: ['CMD-SHELL', 'pg_isready -U postgres -d multiface']
+      test: ['CMD-SHELL', 'pg_isready -U ${DB_USERNAME} -d ${DB_NAME}']
       interval: 5s
       timeout: 3s
       retries: 20
+    networks:
+      - multiface_web_network
 
   redis:
-    image: redis:7-alpine
-    container_name: multiface-redis
+    image: redis:8-alpine
+    container_name: redis_cache
     ports:
       - '${REDIS_PORT}:6379'
+    env_file:
+      - .env
+    command: redis-server --appendonly yes
+    volumes:
+      - multiface_web_cache:/data
+    networks:
+      - multiface_web_network
 
 volumes:
   multiface_web_data:
+  multiface_web_cache:
+networks:
+  multiface_web_network:
+    driver: bridge
