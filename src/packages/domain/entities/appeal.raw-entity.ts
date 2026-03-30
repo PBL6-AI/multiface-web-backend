@@ -1,0 +1,19 @@
+import { ApprovalStatus } from '../../../common/domain/enums';
+import type { RawAttendanceSessionEntity } from './attendance-session.raw-entity';
+import type { RawFileEntity } from './file.raw-entity';
+import type { RawUserEntity } from './user.raw-entity';
+
+export interface RawAppealEntity {
+  id: number;
+  studentId: number;
+  sessionId: number;
+  reason: string;
+  evidenceFileId: number | null;
+  status: ApprovalStatus;
+  reviewedById: number | null;
+  reviewedAt: Date | null;
+  student: RawUserEntity;
+  session: RawAttendanceSessionEntity;
+  evidenceFile: RawFileEntity | null;
+  reviewedBy: RawUserEntity | null;
+}
