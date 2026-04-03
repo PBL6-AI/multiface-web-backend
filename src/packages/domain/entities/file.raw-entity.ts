@@ -14,10 +14,13 @@ export interface RawFileEntity {
   mimeType: string;
   size: number;
   category: string;
+  storageProvider: string;
+  checksum: string | null;
   createdAt: Date;
   uploader: RawUserEntity;
   avatarUsers: RawUserEntity[];
   faceImages: RawFaceImageEntity[];
+  alignedFaceImages: RawFaceImageEntity[];
   attendanceRecords: RawAttendanceRecordEntity[];
   recognitionEvents: RawRecognitionEventEntity[];
   unknownFaces: RawUnknownFaceEntity[];

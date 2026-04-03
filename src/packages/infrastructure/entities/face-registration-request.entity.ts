@@ -1,7 +1,8 @@
-﻿import {
+import {
   Column,
   CreateDateColumn,
   Entity,
+  Index,
   JoinColumn,
   ManyToOne,
   OneToMany,
@@ -12,6 +13,11 @@ import { FaceImageEntity } from './face-image.entity';
 import { UserEntity } from './user.entity';
 
 @Entity('face_registration_requests')
+@Index('IDX_face_registration_requests_student_status_created', [
+  'studentId',
+  'status',
+  'createdAt',
+])
 export class FaceRegistrationRequestEntity {
   @PrimaryGeneratedColumn({ type: 'int' })
   id: number;
@@ -30,13 +36,13 @@ export class FaceRegistrationRequestEntity {
   @Column({ name: 'reviewed_by', type: 'int', nullable: true })
   reviewedById: number | null;
 
-  @Column({ name: 'reviewed_at', type: 'datetime', nullable: true })
+  @Column({ name: 'reviewed_at', type: 'timestamp', nullable: true })
   reviewedAt: Date | null;
 
   @Column({ name: 'rejection_reason', type: 'text', nullable: true })
   rejectionReason: string | null;
 
-  @CreateDateColumn({ name: 'created_at', type: 'datetime' })
+  @CreateDateColumn({ name: 'created_at', type: 'timestamp' })
   createdAt: Date;
 
   @ManyToOne(() => UserEntity, (user) => user.faceRegistrationRequests, {
@@ -59,3 +65,4 @@ export class FaceRegistrationRequestEntity {
   @OneToMany(() => FaceImageEntity, (faceImage) => faceImage.request)
   faceImages: FaceImageEntity[];
 }
+

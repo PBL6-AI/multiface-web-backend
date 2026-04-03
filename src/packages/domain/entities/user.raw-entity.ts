@@ -18,6 +18,7 @@ import type { RawSpecializationEntity } from './specialization.raw-entity';
 export interface RawUserEntity {
   id: number;
   fullName: string;
+  userCode: string;
   email: string;
   passwordHash: string;
   roleId: number;

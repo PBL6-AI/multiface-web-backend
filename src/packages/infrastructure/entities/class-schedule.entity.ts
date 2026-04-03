@@ -1,14 +1,24 @@
-﻿import {
+import {
   Column,
   CreateDateColumn,
   Entity,
+  Index,
   JoinColumn,
   ManyToOne,
   PrimaryGeneratedColumn,
+  Unique,
 } from 'typeorm';
 import { ClassEntity } from './class.entity';
 
 @Entity('class_schedules')
+@Unique('UQ_class_schedules_class_slot_room', [
+  'classId',
+  'dayOfWeek',
+  'startTime',
+  'endTime',
+  'room',
+])
+@Index('IDX_class_schedules_class_id', ['classId'])
 export class ClassScheduleEntity {
   @PrimaryGeneratedColumn({ type: 'int' })
   id: number;
@@ -28,7 +38,7 @@ export class ClassScheduleEntity {
   @Column({ name: 'room', type: 'varchar', length: 100 })
   room: string;
 
-  @CreateDateColumn({ name: 'created_at', type: 'datetime' })
+  @CreateDateColumn({ name: 'created_at', type: 'timestamp' })
   createdAt: Date;
 
   @ManyToOne(() => ClassEntity, (classEntity) => classEntity.schedules, {
@@ -37,3 +47,4 @@ export class ClassScheduleEntity {
   @JoinColumn({ name: 'class_id' })
   classEntity: ClassEntity;
 }
+

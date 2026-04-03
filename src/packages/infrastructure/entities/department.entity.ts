@@ -1,14 +1,16 @@
-﻿import {
+import {
   Column,
   CreateDateColumn,
   Entity,
   OneToMany,
   PrimaryGeneratedColumn,
+  Unique,
 } from 'typeorm';
 import { SpecializationEntity } from './specialization.entity';
 import { UserEntity } from './user.entity';
 
 @Entity('departments')
+@Unique('UQ_departments_code', ['code'])
 export class DepartmentEntity {
   @PrimaryGeneratedColumn({ type: 'int' })
   id: number;
@@ -22,7 +24,7 @@ export class DepartmentEntity {
   @Column({ name: 'description', type: 'text', nullable: true })
   description: string | null;
 
-  @CreateDateColumn({ name: 'created_at', type: 'datetime' })
+  @CreateDateColumn({ name: 'created_at', type: 'timestamp' })
   createdAt: Date;
 
   @OneToMany(
@@ -34,3 +36,4 @@ export class DepartmentEntity {
   @OneToMany(() => UserEntity, (user) => user.department)
   users: UserEntity[];
 }
+

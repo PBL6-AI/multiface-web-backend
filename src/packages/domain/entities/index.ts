@@ -1,6 +1,3 @@
-export * from './auth-user';
-export * from './user-profile';
-
 export * from './appeal.raw-entity';
 export * from './attendance-record.raw-entity';
 export * from './attendance-session.raw-entity';
@@ -22,5 +19,3 @@ export * from './role.raw-entity';
 export * from './specialization.raw-entity';
 export * from './unknown-face.raw-entity';
 export * from './user.raw-entity';
-
-export type { RawEntity } from './raw-entity.type';

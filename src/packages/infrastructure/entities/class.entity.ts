@@ -1,7 +1,8 @@
-﻿import {
+import {
   Column,
   CreateDateColumn,
   Entity,
+  Index,
   JoinColumn,
   ManyToOne,
   OneToMany,
@@ -16,6 +17,7 @@ import { UserEntity } from './user.entity';
 
 @Entity('classes')
 @Unique('UQ_classes_class_code', ['classCode'])
+@Index('IDX_classes_teacher_id', ['teacherId'])
 export class ClassEntity {
   @PrimaryGeneratedColumn({ type: 'int' })
   id: number;
@@ -32,7 +34,7 @@ export class ClassEntity {
   @Column({ name: 'description', type: 'text', nullable: true })
   description: string | null;
 
-  @CreateDateColumn({ name: 'created_at', type: 'datetime' })
+  @CreateDateColumn({ name: 'created_at', type: 'timestamp' })
   createdAt: Date;
 
   @ManyToOne(() => UserEntity, (user) => user.taughtClasses, {
@@ -62,3 +64,4 @@ export class ClassEntity {
   )
   leaveRequests: LeaveRequestEntity[];
 }
+

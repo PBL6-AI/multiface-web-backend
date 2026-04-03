@@ -1,6 +1,7 @@
-﻿import {
+import {
   Column,
   Entity,
+  Index,
   JoinColumn,
   ManyToOne,
   OneToMany,
@@ -16,6 +17,8 @@ import { UnknownFaceEntity } from './unknown-face.entity';
 import { UserEntity } from './user.entity';
 
 @Entity('attendance_sessions')
+@Index('IDX_attendance_sessions_class_start', ['classId', 'startTime'])
+@Index('IDX_attendance_sessions_status', ['status'])
 export class AttendanceSessionEntity {
   @PrimaryGeneratedColumn({ type: 'int' })
   id: number;
@@ -26,10 +29,10 @@ export class AttendanceSessionEntity {
   @Column({ name: 'created_by', type: 'int' })
   createdById: number;
 
-  @Column({ name: 'start_time', type: 'datetime' })
+  @Column({ name: 'start_time', type: 'timestamp' })
   startTime: Date;
 
-  @Column({ name: 'end_time', type: 'datetime', nullable: true })
+  @Column({ name: 'end_time', type: 'timestamp', nullable: true })
   endTime: Date | null;
 
   @Column({
@@ -88,3 +91,4 @@ export class AttendanceSessionEntity {
   @OneToMany(() => AppealEntity, (appeal) => appeal.session)
   appeals: AppealEntity[];
 }
+
