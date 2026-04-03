@@ -1,0 +1,8 @@
+#!/usr/bin/env sh
+
+if git diff --cached --name-only --diff-filter=ACMR --quiet; then
+  exit 0
+fi
+
+git diff --cached --name-only --diff-filter=ACMR -z | xargs -0 node scripts/run-staged-checks.mjs
+git diff --cached --name-only --diff-filter=ACMR -z | xargs -0 git add --

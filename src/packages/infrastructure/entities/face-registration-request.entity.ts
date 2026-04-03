@@ -65,4 +65,3 @@ export class FaceRegistrationRequestEntity {
   @OneToMany(() => FaceImageEntity, (faceImage) => faceImage.request)
   faceImages: FaceImageEntity[];
 }
-

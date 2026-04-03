@@ -45,4 +45,3 @@ export class SpecializationEntity {
   @OneToMany(() => UserEntity, (user) => user.specialization)
   users: UserEntity[];
 }
-

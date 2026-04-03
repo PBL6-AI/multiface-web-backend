@@ -143,4 +143,3 @@ export class RecognitionEventEntity {
   @JoinColumn({ name: 'matched_embedding_id' })
   matchedEmbedding: FaceEmbeddingEntity | null;
 }
-

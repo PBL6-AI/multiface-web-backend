@@ -15,7 +15,11 @@ import { FileEntity } from './file.entity';
 import { UserEntity } from './user.entity';
 
 @Entity('face_images')
-@Index('IDX_face_images_request_status_created', ['requestId', 'status', 'createdAt'])
+@Index('IDX_face_images_request_status_created', [
+  'requestId',
+  'status',
+  'createdAt',
+])
 @Index('IDX_face_images_student_status', ['studentId', 'status'])
 export class FaceImageEntity {
   @PrimaryGeneratedColumn({ type: 'int' })
@@ -112,4 +116,3 @@ export class FaceImageEntity {
   )
   embeddings: FaceEmbeddingEntity[];
 }
-

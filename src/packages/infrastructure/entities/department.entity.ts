@@ -36,4 +36,3 @@ export class DepartmentEntity {
   @OneToMany(() => UserEntity, (user) => user.department)
   users: UserEntity[];
 }
-

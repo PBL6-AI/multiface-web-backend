@@ -29,4 +29,3 @@ export class PermissionEntity {
   )
   rolePermissions: RolePermissionEntity[];
 }
-

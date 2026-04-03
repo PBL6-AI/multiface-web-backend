@@ -35,4 +35,3 @@ export class RolePermissionEntity {
   @JoinColumn({ name: 'permission_id' })
   permission: PermissionEntity;
 }
-

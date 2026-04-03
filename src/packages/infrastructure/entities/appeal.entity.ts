@@ -15,7 +15,11 @@ import { FileEntity } from './file.entity';
 import { UserEntity } from './user.entity';
 
 @Entity('appeals')
-@Index('IDX_appeals_student_status_created', ['studentId', 'status', 'createdAt'])
+@Index('IDX_appeals_student_status_created', [
+  'studentId',
+  'status',
+  'createdAt',
+])
 @Index('IDX_appeals_attendance_record_id', ['attendanceRecordId'])
 export class AppealEntity {
   @PrimaryGeneratedColumn({ type: 'int' })
@@ -96,4 +100,3 @@ export class AppealEntity {
   @JoinColumn({ name: 'reviewed_by' })
   reviewedBy: UserEntity | null;
 }
-

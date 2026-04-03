@@ -12,4 +12,4 @@ export interface LogoutResponseDto {
 
 export type RefreshTokenResponseDto = LoginResponseDto;
 
-export interface RegisterResponseDto extends UserResponseDto {}
+export type RegisterResponseDto = UserResponseDto;

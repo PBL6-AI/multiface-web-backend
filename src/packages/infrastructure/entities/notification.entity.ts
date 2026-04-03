@@ -42,4 +42,3 @@ export class NotificationEntity {
   @JoinColumn({ name: 'user_id' })
   user: UserEntity;
 }
-

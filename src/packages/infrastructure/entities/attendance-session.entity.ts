@@ -91,4 +91,3 @@ export class AttendanceSessionEntity {
   @OneToMany(() => AppealEntity, (appeal) => appeal.session)
   appeals: AppealEntity[];
 }
-
