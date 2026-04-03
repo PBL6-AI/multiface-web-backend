@@ -78,4 +78,3 @@ export class AttendanceRecordEntity {
   @JoinColumn({ name: 'recognition_event_id' })
   recognitionEvent: RecognitionEventEntity | null;
 }
-

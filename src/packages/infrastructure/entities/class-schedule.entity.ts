@@ -47,4 +47,3 @@ export class ClassScheduleEntity {
   @JoinColumn({ name: 'class_id' })
   classEntity: ClassEntity;
 }
-

@@ -17,7 +17,11 @@ import { UnknownFaceEntity } from './unknown-face.entity';
 import { UserEntity } from './user.entity';
 
 @Entity('files')
-@Index('IDX_files_uploader_category_created', ['uploaderId', 'category', 'createdAt'])
+@Index('IDX_files_uploader_category_created', [
+  'uploaderId',
+  'category',
+  'createdAt',
+])
 export class FileEntity {
   @PrimaryGeneratedColumn({ type: 'int' })
   id: number;
@@ -93,4 +97,3 @@ export class FileEntity {
   @OneToMany(() => AppealEntity, (appeal) => appeal.evidenceFile)
   appealEvidence: AppealEntity[];
 }
-

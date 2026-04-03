@@ -108,4 +108,3 @@ export class FaceEmbeddingEntity {
   @JoinColumn({ name: 'face_image_id' })
   faceImage: FaceImageEntity;
 }
-

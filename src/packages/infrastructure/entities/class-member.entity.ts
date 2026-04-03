@@ -39,4 +39,3 @@ export class ClassMemberEntity {
   @JoinColumn({ name: 'student_id' })
   student: UserEntity;
 }
-

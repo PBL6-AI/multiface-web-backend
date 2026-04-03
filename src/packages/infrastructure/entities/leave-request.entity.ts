@@ -100,4 +100,3 @@ export class LeaveRequestEntity {
   @JoinColumn({ name: 'reviewed_by' })
   reviewedBy: UserEntity | null;
 }
-

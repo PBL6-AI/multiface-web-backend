@@ -54,4 +54,3 @@ export class UnknownFaceEntity {
   @JoinColumn({ name: 'image_file_id' })
   imageFile: FileEntity;
 }
-
