@@ -1,15 +1,18 @@
-﻿import {
+import {
   Column,
   CreateDateColumn,
   Entity,
+  Index,
   JoinColumn,
   ManyToOne,
   PrimaryGeneratedColumn,
 } from 'typeorm';
+import type { FaceBoundingBox } from '../../../common/types';
 import { AttendanceSessionEntity } from './attendance-session.entity';
 import { FileEntity } from './file.entity';
 
 @Entity('unknown_faces')
+@Index('IDX_unknown_faces_session_detected', ['sessionId', 'detectedAt'])
 export class UnknownFaceEntity {
   @PrimaryGeneratedColumn({ type: 'int' })
   id: number;
@@ -23,7 +26,16 @@ export class UnknownFaceEntity {
   @Column({ name: 'image_file_id', type: 'int' })
   imageFileId: number;
 
-  @CreateDateColumn({ name: 'detected_at', type: 'datetime' })
+  @Column({ name: 'anti_spoofing_score', type: 'float', nullable: true })
+  antiSpoofingScore: number | null;
+
+  @Column({ name: 'bounding_box', type: 'jsonb', nullable: true })
+  boundingBox: FaceBoundingBox | null;
+
+  @Column({ name: 'metadata', type: 'jsonb', nullable: true })
+  metadata: Record<string, unknown> | null;
+
+  @CreateDateColumn({ name: 'detected_at', type: 'timestamp' })
   detectedAt: Date;
 
   @ManyToOne(
@@ -42,3 +54,4 @@ export class UnknownFaceEntity {
   @JoinColumn({ name: 'image_file_id' })
   imageFile: FileEntity;
 }
+

@@ -1,4 +1,4 @@
-﻿import {
+import {
   CreateDateColumn,
   Entity,
   JoinColumn,
@@ -16,7 +16,7 @@ export class RolePermissionEntity {
   @PrimaryColumn({ name: 'permission_id', type: 'int' })
   permissionId: number;
 
-  @CreateDateColumn({ name: 'created_at', type: 'datetime' })
+  @CreateDateColumn({ name: 'created_at', type: 'timestamp' })
   createdAt: Date;
 
   @ManyToOne(() => RoleEntity, (role) => role.rolePermissions, {
@@ -35,3 +35,4 @@ export class RolePermissionEntity {
   @JoinColumn({ name: 'permission_id' })
   permission: PermissionEntity;
 }
+

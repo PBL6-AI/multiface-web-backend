@@ -1,7 +1,8 @@
-﻿import {
+import {
   Column,
   CreateDateColumn,
   Entity,
+  Index,
   JoinColumn,
   ManyToOne,
   OneToMany,
@@ -28,12 +29,20 @@ import { SpecializationEntity } from './specialization.entity';
 
 @Entity('users')
 @Unique('UQ_users_email', ['email'])
+@Unique('UQ_users_user_code', ['userCode'])
+@Index('IDX_users_user_code', ['userCode'])
+@Index('IDX_users_role_id', ['roleId'])
+@Index('IDX_users_department_id', ['departmentId'])
+@Index('IDX_users_specialization_id', ['specializationId'])
 export class UserEntity {
   @PrimaryGeneratedColumn({ type: 'int' })
   id: number;
 
   @Column({ name: 'full_name', type: 'varchar', length: 255 })
   fullName: string;
+
+  @Column({ name: 'user_code', type: 'varchar', length: 50 })
+  userCode: string;
 
   @Column({ name: 'email', type: 'varchar', length: 255 })
   email: string;
@@ -56,10 +65,10 @@ export class UserEntity {
   @Column({ name: 'specialization_id', type: 'int', nullable: true })
   specializationId: number | null;
 
-  @CreateDateColumn({ name: 'created_at', type: 'datetime' })
+  @CreateDateColumn({ name: 'created_at', type: 'timestamp' })
   createdAt: Date;
 
-  @UpdateDateColumn({ name: 'updated_at', type: 'datetime' })
+  @UpdateDateColumn({ name: 'updated_at', type: 'timestamp' })
   updatedAt: Date;
 
   @ManyToOne(() => RoleEntity, (role) => role.users, { onDelete: 'RESTRICT' })
@@ -160,3 +169,4 @@ export class UserEntity {
   @OneToMany(() => NotificationEntity, (notification) => notification.user)
   notifications: NotificationEntity[];
 }
+

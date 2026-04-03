@@ -1,7 +1,8 @@
-﻿import {
+import {
   Column,
   CreateDateColumn,
   Entity,
+  Index,
   JoinColumn,
   ManyToOne,
   PrimaryGeneratedColumn,
@@ -9,6 +10,11 @@
 import { UserEntity } from './user.entity';
 
 @Entity('refresh_tokens')
+@Index('IDX_refresh_tokens_user_expires_revoked', [
+  'userId',
+  'expiresAt',
+  'revokedAt',
+])
 export class RefreshTokenEntity {
   @PrimaryGeneratedColumn({ type: 'int' })
   id: number;
@@ -19,13 +25,13 @@ export class RefreshTokenEntity {
   @Column({ name: 'token', type: 'varchar', length: 500 })
   token: string;
 
-  @Column({ name: 'expires_at', type: 'datetime' })
+  @Column({ name: 'expires_at', type: 'timestamp' })
   expiresAt: Date;
 
-  @Column({ name: 'revoked_at', type: 'datetime', nullable: true })
+  @Column({ name: 'revoked_at', type: 'timestamp', nullable: true })
   revokedAt: Date | null;
 
-  @CreateDateColumn({ name: 'created_at', type: 'datetime' })
+  @CreateDateColumn({ name: 'created_at', type: 'timestamp' })
   createdAt: Date;
 
   @ManyToOne(() => UserEntity, (user) => user.refreshTokens, {
@@ -34,3 +40,4 @@ export class RefreshTokenEntity {
   @JoinColumn({ name: 'user_id' })
   user: UserEntity;
 }
+

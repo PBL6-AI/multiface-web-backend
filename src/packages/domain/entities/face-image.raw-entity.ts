@@ -9,14 +9,20 @@ export interface RawFaceImageEntity {
   studentId: number;
   requestId: number;
   fileId: number;
+  alignedFileId: number | null;
   status: ApprovalStatus;
   reviewedById: number | null;
   reviewedAt: Date | null;
   rejectionReason: string | null;
+  captureSource: string;
+  qualityScore: number | null;
+  capturedAt: Date | null;
+  metadata: Record<string, unknown> | null;
   createdAt: Date;
   student: RawUserEntity;
   request: RawFaceRegistrationRequestEntity;
   file: RawFileEntity;
+  alignedFile: RawFileEntity | null;
   reviewedBy: RawUserEntity | null;
   embeddings: RawFaceEmbeddingEntity[];
 }

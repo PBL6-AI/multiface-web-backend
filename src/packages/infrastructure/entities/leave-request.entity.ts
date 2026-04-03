@@ -1,10 +1,12 @@
-﻿import {
+import {
   Column,
   CreateDateColumn,
   Entity,
+  Index,
   JoinColumn,
   ManyToOne,
   PrimaryGeneratedColumn,
+  UpdateDateColumn,
 } from 'typeorm';
 import { ApprovalStatus } from './enums';
 import { AttendanceSessionEntity } from './attendance-session.entity';
@@ -13,6 +15,12 @@ import { FileEntity } from './file.entity';
 import { UserEntity } from './user.entity';
 
 @Entity('leave_requests')
+@Index('IDX_leave_requests_student_status_created', [
+  'studentId',
+  'status',
+  'createdAt',
+])
+@Index('IDX_leave_requests_class_session', ['classId', 'sessionId'])
 export class LeaveRequestEntity {
   @PrimaryGeneratedColumn({ type: 'int' })
   id: number;
@@ -43,11 +51,17 @@ export class LeaveRequestEntity {
   @Column({ name: 'reviewed_by', type: 'int', nullable: true })
   reviewedById: number | null;
 
-  @Column({ name: 'reviewed_at', type: 'datetime', nullable: true })
+  @Column({ name: 'reviewed_at', type: 'timestamp', nullable: true })
   reviewedAt: Date | null;
 
-  @CreateDateColumn({ name: 'created_at', type: 'datetime' })
+  @Column({ name: 'rejection_reason', type: 'text', nullable: true })
+  rejectionReason: string | null;
+
+  @CreateDateColumn({ name: 'created_at', type: 'timestamp' })
   createdAt: Date;
+
+  @UpdateDateColumn({ name: 'updated_at', type: 'timestamp' })
+  updatedAt: Date;
 
   @ManyToOne(() => UserEntity, (user) => user.leaveRequests, {
     onDelete: 'CASCADE',
@@ -86,3 +100,4 @@ export class LeaveRequestEntity {
   @JoinColumn({ name: 'reviewed_by' })
   reviewedBy: UserEntity | null;
 }
+

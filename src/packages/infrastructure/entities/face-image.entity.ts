@@ -1,7 +1,8 @@
-﻿import {
+import {
   Column,
   CreateDateColumn,
   Entity,
+  Index,
   JoinColumn,
   ManyToOne,
   OneToMany,
@@ -14,6 +15,8 @@ import { FileEntity } from './file.entity';
 import { UserEntity } from './user.entity';
 
 @Entity('face_images')
+@Index('IDX_face_images_request_status_created', ['requestId', 'status', 'createdAt'])
+@Index('IDX_face_images_student_status', ['studentId', 'status'])
 export class FaceImageEntity {
   @PrimaryGeneratedColumn({ type: 'int' })
   id: number;
@@ -27,6 +30,9 @@ export class FaceImageEntity {
   @Column({ name: 'file_id', type: 'int' })
   fileId: number;
 
+  @Column({ name: 'aligned_file_id', type: 'int', nullable: true })
+  alignedFileId: number | null;
+
   @Column({
     name: 'status',
     type: 'enum',
@@ -38,13 +44,30 @@ export class FaceImageEntity {
   @Column({ name: 'reviewed_by', type: 'int', nullable: true })
   reviewedById: number | null;
 
-  @Column({ name: 'reviewed_at', type: 'datetime', nullable: true })
+  @Column({ name: 'reviewed_at', type: 'timestamp', nullable: true })
   reviewedAt: Date | null;
 
   @Column({ name: 'rejection_reason', type: 'text', nullable: true })
   rejectionReason: string | null;
 
-  @CreateDateColumn({ name: 'created_at', type: 'datetime' })
+  @Column({
+    name: 'capture_source',
+    type: 'varchar',
+    length: 50,
+    default: 'user_upload',
+  })
+  captureSource: string;
+
+  @Column({ name: 'quality_score', type: 'float', nullable: true })
+  qualityScore: number | null;
+
+  @Column({ name: 'captured_at', type: 'timestamp', nullable: true })
+  capturedAt: Date | null;
+
+  @Column({ name: 'metadata', type: 'jsonb', nullable: true })
+  metadata: Record<string, unknown> | null;
+
+  @CreateDateColumn({ name: 'created_at', type: 'timestamp' })
   createdAt: Date;
 
   @ManyToOne(() => UserEntity, (user) => user.faceImages, {
@@ -69,6 +92,13 @@ export class FaceImageEntity {
   @JoinColumn({ name: 'file_id' })
   file: FileEntity;
 
+  @ManyToOne(() => FileEntity, (file) => file.alignedFaceImages, {
+    onDelete: 'SET NULL',
+    nullable: true,
+  })
+  @JoinColumn({ name: 'aligned_file_id' })
+  alignedFile: FileEntity | null;
+
   @ManyToOne(() => UserEntity, (user) => user.reviewedFaceImages, {
     onDelete: 'SET NULL',
     nullable: true,
@@ -82,3 +112,4 @@ export class FaceImageEntity {
   )
   embeddings: FaceEmbeddingEntity[];
 }
+

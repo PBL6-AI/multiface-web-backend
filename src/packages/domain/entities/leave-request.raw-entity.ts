@@ -14,7 +14,9 @@ export interface RawLeaveRequestEntity {
   status: ApprovalStatus;
   reviewedById: number | null;
   reviewedAt: Date | null;
+  rejectionReason: string | null;
   createdAt: Date;
+  updatedAt: Date;
   student: RawUserEntity;
   classEntity: RawClassEntity;
   session: RawAttendanceSessionEntity | null;

@@ -1,7 +1,8 @@
-﻿import {
+import {
   Column,
   CreateDateColumn,
   Entity,
+  Index,
   JoinColumn,
   ManyToOne,
   OneToMany,
@@ -16,6 +17,7 @@ import { UnknownFaceEntity } from './unknown-face.entity';
 import { UserEntity } from './user.entity';
 
 @Entity('files')
+@Index('IDX_files_uploader_category_created', ['uploaderId', 'category', 'createdAt'])
 export class FileEntity {
   @PrimaryGeneratedColumn({ type: 'int' })
   id: number;
@@ -38,7 +40,18 @@ export class FileEntity {
   @Column({ name: 'category', type: 'varchar', length: 100 })
   category: string;
 
-  @CreateDateColumn({ name: 'created_at', type: 'datetime' })
+  @Column({
+    name: 'storage_provider',
+    type: 'varchar',
+    length: 50,
+    default: 'local',
+  })
+  storageProvider: string;
+
+  @Column({ name: 'checksum', type: 'varchar', length: 255, nullable: true })
+  checksum: string | null;
+
+  @CreateDateColumn({ name: 'created_at', type: 'timestamp' })
   createdAt: Date;
 
   @ManyToOne(() => UserEntity, (user) => user.uploadedFiles, {
@@ -52,6 +65,9 @@ export class FileEntity {
 
   @OneToMany(() => FaceImageEntity, (faceImage) => faceImage.file)
   faceImages: FaceImageEntity[];
+
+  @OneToMany(() => FaceImageEntity, (faceImage) => faceImage.alignedFile)
+  alignedFaceImages: FaceImageEntity[];
 
   @OneToMany(
     () => AttendanceRecordEntity,
@@ -77,3 +93,4 @@ export class FileEntity {
   @OneToMany(() => AppealEntity, (appeal) => appeal.evidenceFile)
   appealEvidence: AppealEntity[];
 }
+

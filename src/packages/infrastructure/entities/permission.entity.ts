@@ -1,4 +1,4 @@
-﻿import {
+import {
   Column,
   CreateDateColumn,
   Entity,
@@ -20,7 +20,7 @@ export class PermissionEntity {
   @Column({ name: 'description', type: 'text', nullable: true })
   description: string | null;
 
-  @CreateDateColumn({ name: 'created_at', type: 'datetime' })
+  @CreateDateColumn({ name: 'created_at', type: 'timestamp' })
   createdAt: Date;
 
   @OneToMany(
@@ -29,3 +29,4 @@ export class PermissionEntity {
   )
   rolePermissions: RolePermissionEntity[];
 }
+

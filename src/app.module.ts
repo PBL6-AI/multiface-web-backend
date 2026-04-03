@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
+import databaseConfig from './config/database.config';
 import envConfig from './config/env.config';
 import { typeOrmConfig } from './database/typeorm.config';
 import { UsersModule } from './modules/users/users.module';
@@ -11,7 +12,7 @@ import { FacesModule } from './modules/faces/faces.module';
   imports: [
     ConfigModule.forRoot({
       isGlobal: true,
-      load: [envConfig],
+      load: [envConfig, databaseConfig],
     }),
     TypeOrmModule.forRootAsync(typeOrmConfig),
     UsersModule,

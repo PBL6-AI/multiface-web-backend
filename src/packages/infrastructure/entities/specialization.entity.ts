@@ -1,4 +1,4 @@
-﻿import {
+import {
   Column,
   CreateDateColumn,
   Entity,
@@ -6,11 +6,13 @@
   ManyToOne,
   OneToMany,
   PrimaryGeneratedColumn,
+  Unique,
 } from 'typeorm';
 import { DepartmentEntity } from './department.entity';
 import { UserEntity } from './user.entity';
 
 @Entity('specializations')
+@Unique('UQ_specializations_department_code', ['departmentId', 'code'])
 export class SpecializationEntity {
   @PrimaryGeneratedColumn({ type: 'int' })
   id: number;
@@ -27,7 +29,7 @@ export class SpecializationEntity {
   @Column({ name: 'description', type: 'text', nullable: true })
   description: string | null;
 
-  @CreateDateColumn({ name: 'created_at', type: 'datetime' })
+  @CreateDateColumn({ name: 'created_at', type: 'timestamp' })
   createdAt: Date;
 
   @ManyToOne(
@@ -43,3 +45,4 @@ export class SpecializationEntity {
   @OneToMany(() => UserEntity, (user) => user.specialization)
   users: UserEntity[];
 }
+
