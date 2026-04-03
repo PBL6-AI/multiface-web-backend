@@ -17,6 +17,7 @@
     "lint": "eslint . --max-warnings=0",
     "lint:fix": "eslint . --fix",
     "check": "pnpm run format:check && pnpm run lint",
+    "seed:users": "node scripts/seed-users.mjs",
     "test": "jest",
     "test:watch": "jest --watch",
     "test:cov": "jest --coverage",
