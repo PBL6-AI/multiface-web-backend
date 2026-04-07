@@ -9,7 +9,7 @@ import {
 } from '../dtos/auth-request.dto';
 import type { AuthenticatedUser } from '../interfaces/authenticated-user.interface';
 import { AuthService } from '../services/auth.service';
-import { ApiSuccessResponse } from '@/common/types';
+import type { ApiSuccessResponse } from '../../../common/types';
 import {
   LoginResponseDto,
   LogoutResponseDto,
