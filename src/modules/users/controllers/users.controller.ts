@@ -9,11 +9,19 @@ import {
   Query,
   UseGuards,
 } from '@nestjs/common';
+import {
+  ApiBearerAuth,
+  ApiForbiddenResponse,
+  ApiOperation,
+  ApiTags,
+  ApiUnauthorizedResponse,
+} from '@nestjs/swagger';
 import type { ApiSuccessResponse } from '../../../common/types';
 import { CurrentUser } from '../../../common/decorators/current-user.decorator';
 import { Roles } from '../../../common/decorators/roles.decorator';
 import { AuthGuard } from '../../../common/guards/auth.guard';
 import { RolesGuard } from '../../../common/guards/roles.guard';
+import { ApiSuccessResponseDoc } from '../../../common/swagger/api-success-response.decorator';
 import type { AuthenticatedUser } from '../../auth/interfaces/authenticated-user.interface';
 import {
   CreateUserDto,
@@ -21,15 +29,28 @@ import {
   UpdateProfileDto,
   UpdateUserDto,
 } from '../dtos/users-request.dto';
-import type { UserResponseDto } from '../dtos/users-response.dto';
+import { UserResponseDto } from '../dtos/users-response.dto';
 import { UsersService } from '../services/users.service';
 
+@ApiTags('Users')
+@ApiBearerAuth()
+@ApiUnauthorizedResponse({
+  description: 'Authentication token is missing or invalid',
+})
 @Controller('users')
 export class UsersController {
   constructor(private readonly usersService: UsersService) {}
 
   @Get('me')
   @UseGuards(AuthGuard)
+  @ApiOperation({
+    summary: 'Get my profile',
+    description: 'Returns the profile of the currently authenticated user.',
+  })
+  @ApiSuccessResponseDoc({
+    description: 'Profile returned successfully',
+    model: UserResponseDto,
+  })
   async getMyProfile(
     @CurrentUser() currentUser: AuthenticatedUser,
   ): Promise<ApiSuccessResponse<UserResponseDto>> {
@@ -38,6 +59,14 @@ export class UsersController {
 
   @Patch('me')
   @UseGuards(AuthGuard)
+  @ApiOperation({
+    summary: 'Update my profile',
+    description: 'Updates the profile of the currently authenticated user.',
+  })
+  @ApiSuccessResponseDoc({
+    description: 'Profile updated successfully',
+    model: UserResponseDto,
+  })
   async updateMyProfile(
     @CurrentUser() currentUser: AuthenticatedUser,
     @Body() updateProfileDto: UpdateProfileDto,
@@ -50,6 +79,18 @@ export class UsersController {
   @Post()
   @UseGuards(AuthGuard, RolesGuard)
   @Roles('admin')
+  @ApiOperation({
+    summary: 'Create a user',
+    description: 'Allows an administrator to create a new user account.',
+  })
+  @ApiSuccessResponseDoc({
+    status: 201,
+    description: 'User created successfully',
+    model: UserResponseDto,
+  })
+  @ApiForbiddenResponse({
+    description: 'Only administrators can access this endpoint',
+  })
   async createUser(
     @Body() createUserDto: CreateUserDto,
   ): Promise<ApiSuccessResponse<UserResponseDto>> {
@@ -63,6 +104,18 @@ export class UsersController {
   @Get()
   @UseGuards(AuthGuard, RolesGuard)
   @Roles('admin')
+  @ApiOperation({
+    summary: 'List users',
+    description: 'Returns all users, optionally filtered by role.',
+  })
+  @ApiSuccessResponseDoc({
+    description: 'Users returned successfully',
+    model: UserResponseDto,
+    isArray: true,
+  })
+  @ApiForbiddenResponse({
+    description: 'Only administrators can access this endpoint',
+  })
   async listUsers(
     @Query() query: ListUsersQueryDto,
   ): Promise<ApiSuccessResponse<UserResponseDto[]>> {
@@ -72,6 +125,17 @@ export class UsersController {
   @Get(':id')
   @UseGuards(AuthGuard, RolesGuard)
   @Roles('admin')
+  @ApiOperation({
+    summary: 'Get a user by id',
+    description: 'Returns a single user profile by identifier.',
+  })
+  @ApiSuccessResponseDoc({
+    description: 'User returned successfully',
+    model: UserResponseDto,
+  })
+  @ApiForbiddenResponse({
+    description: 'Only administrators can access this endpoint',
+  })
   async getUserById(
     @Param('id', ParseIntPipe) userId: number,
   ): Promise<ApiSuccessResponse<UserResponseDto>> {
@@ -81,6 +145,17 @@ export class UsersController {
   @Patch(':id')
   @UseGuards(AuthGuard, RolesGuard)
   @Roles('admin')
+  @ApiOperation({
+    summary: 'Update a user by id',
+    description: 'Allows an administrator to update a user profile and role.',
+  })
+  @ApiSuccessResponseDoc({
+    description: 'User updated successfully',
+    model: UserResponseDto,
+  })
+  @ApiForbiddenResponse({
+    description: 'Only administrators can access this endpoint',
+  })
   async updateUser(
     @Param('id', ParseIntPipe) userId: number,
     @Body() updateUserDto: UpdateUserDto,

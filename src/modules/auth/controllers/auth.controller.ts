@@ -1,6 +1,21 @@
-import { Body, Controller, Get, Post, UseGuards } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Get,
+  HttpCode,
+  HttpStatus,
+  Post,
+  UseGuards,
+} from '@nestjs/common';
+import {
+  ApiBearerAuth,
+  ApiOperation,
+  ApiTags,
+  ApiUnauthorizedResponse,
+} from '@nestjs/swagger';
 import { CurrentUser } from '../../../common/decorators/current-user.decorator';
 import { AuthGuard } from '../../../common/guards/auth.guard';
+import { ApiSuccessResponseDoc } from '../../../common/swagger/api-success-response.decorator';
 import {
   LoginDto,
   LogoutDto,
@@ -16,13 +31,23 @@ import {
   RefreshTokenResponseDto,
   RegisterResponseDto,
 } from '../dtos/auth-response.dto';
-import type { UserResponseDto } from '../../users/dtos/users-response.dto';
+import { UserResponseDto } from '../../users/dtos/users-response.dto';
 
+@ApiTags('Authentication')
 @Controller('auth')
 export class AuthController {
   constructor(private readonly authService: AuthService) {}
 
   @Post('register')
+  @ApiOperation({
+    summary: 'Register a new student account',
+    description: 'Creates a new account and assigns the default student role.',
+  })
+  @ApiSuccessResponseDoc({
+    status: HttpStatus.CREATED,
+    description: 'Student account registered successfully',
+    model: RegisterResponseDto,
+  })
   async register(
     @Body() registerDto: RegisterDto,
   ): Promise<ApiSuccessResponse<RegisterResponseDto>> {
@@ -30,6 +55,15 @@ export class AuthController {
   }
 
   @Post('login')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary: 'Authenticate a user',
+    description: 'Authenticates a user by user code and password.',
+  })
+  @ApiSuccessResponseDoc({
+    description: 'User authenticated successfully',
+    model: LoginResponseDto,
+  })
   async login(
     @Body() loginDto: LoginDto,
   ): Promise<ApiSuccessResponse<LoginResponseDto>> {
@@ -37,6 +71,15 @@ export class AuthController {
   }
 
   @Post('refresh')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary: 'Refresh authentication tokens',
+    description: 'Issues a new access token and refresh token pair.',
+  })
+  @ApiSuccessResponseDoc({
+    description: 'Tokens refreshed successfully',
+    model: RefreshTokenResponseDto,
+  })
   async refresh(
     @Body() refreshTokenDto: RefreshTokenDto,
   ): Promise<ApiSuccessResponse<RefreshTokenResponseDto>> {
@@ -44,7 +87,21 @@ export class AuthController {
   }
 
   @Post('logout')
+  @HttpCode(HttpStatus.OK)
   @UseGuards(AuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({
+    summary: 'Logout the current user',
+    description:
+      'Logs out the current user and optionally revokes a refresh token.',
+  })
+  @ApiSuccessResponseDoc({
+    description: 'Logout completed successfully',
+    model: LogoutResponseDto,
+  })
+  @ApiUnauthorizedResponse({
+    description: 'Authentication token is missing or invalid',
+  })
   async logout(
     @CurrentUser() currentUser: AuthenticatedUser,
     @Body() logoutDto: LogoutDto,
@@ -54,6 +111,18 @@ export class AuthController {
 
   @Get('me')
   @UseGuards(AuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({
+    summary: 'Get current authenticated user',
+    description: 'Returns the profile of the currently authenticated user.',
+  })
+  @ApiSuccessResponseDoc({
+    description: 'Current user profile returned successfully',
+    model: UserResponseDto,
+  })
+  @ApiUnauthorizedResponse({
+    description: 'Authentication token is missing or invalid',
+  })
   async getMe(
     @CurrentUser() currentUser: AuthenticatedUser,
   ): Promise<ApiSuccessResponse<UserResponseDto>> {

@@ -1,15 +1,34 @@
-import type { UserResponseDto } from '../../users/dtos/users-response.dto';
+import { ApiProperty } from '@nestjs/swagger';
+import { UserResponseDto } from '../../users/dtos/users-response.dto';
 
-export interface LoginResponseDto {
+export class LoginResponseDto {
+  @ApiProperty({
+    description: 'JWT access token used for authenticated API calls',
+    example: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.access',
+  })
   accessToken: string;
+
+  @ApiProperty({
+    description: 'Refresh token used to issue new access tokens',
+    example: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.refresh',
+  })
   refreshToken: string;
+
+  @ApiProperty({
+    description: 'Authenticated user profile',
+    type: () => UserResponseDto,
+  })
   user: UserResponseDto;
 }
 
-export interface LogoutResponseDto {
+export class LogoutResponseDto {
+  @ApiProperty({
+    description: 'Human-readable logout result',
+    example: 'Logged out successfully',
+  })
   message: string;
 }
 
-export type RefreshTokenResponseDto = LoginResponseDto;
+export class RefreshTokenResponseDto extends LoginResponseDto {}
 
-export type RegisterResponseDto = UserResponseDto;
+export class RegisterResponseDto extends UserResponseDto {}

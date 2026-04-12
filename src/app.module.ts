@@ -4,6 +4,7 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import databaseConfig from './config/database.config';
 import envConfig from './config/env.config';
 import { typeOrmConfig } from './database/typeorm.config';
+import { ClassesModule } from './modules/classes/classes.module';
 import { UsersModule } from './modules/users/users.module';
 import { AuthModule } from './modules/auth/auth.module';
 import { FacesModule } from './modules/faces/faces.module';
@@ -15,6 +16,7 @@ import { FacesModule } from './modules/faces/faces.module';
       load: [envConfig, databaseConfig],
     }),
     TypeOrmModule.forRootAsync(typeOrmConfig),
+    ClassesModule,
     UsersModule,
     AuthModule,
     FacesModule,
