@@ -1,13 +1,9 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
-import databaseConfig from './config/database.config';
-import envConfig from './config/env.config';
-import { typeOrmConfig } from './database/typeorm.config';
-import { ClassesModule } from './modules/classes/classes.module';
-import { UsersModule } from './modules/users/users.module';
-import { AuthModule } from './modules/auth/auth.module';
-import { FacesModule } from './modules/faces/faces.module';
+import { databaseConfig, envConfig } from './config';
+import { typeOrmConfig } from './database';
+import { AuthModule, ClassesModule, FacesModule, UsersModule } from './modules';
 
 @Module({
   imports: [

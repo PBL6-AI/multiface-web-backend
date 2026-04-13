@@ -17,23 +17,21 @@ import {
   ApiTags,
   ApiUnauthorizedResponse,
 } from '@nestjs/swagger';
-import { ApiSuccessResponseDoc } from '../../../common/swagger/api-success-response.decorator';
+import { CurrentUser } from '../../../common/decorators';
+import { AuthGuard } from '../../../common/guards';
+import { ApiSuccessResponseDoc } from '../../../common/swagger';
 import type { ApiSuccessResponse } from '../../../common/types';
-import { CurrentUser } from '../../../common/decorators/current-user.decorator';
-import { AuthGuard } from '../../../common/guards/auth.guard';
-import type { AuthenticatedUser } from '../../auth/interfaces/authenticated-user.interface';
+import type { AuthenticatedUser } from '../../auth/interfaces';
 import {
   CreateClassDto,
   JoinClassByCodeDto,
   UpdateClassDto,
-} from '../dtos/classes-request.dto';
-import {
   ActionMessageResponseDto,
   ClassDetailResponseDto,
   ClassMemberSummaryDto,
   ClassResponseDto,
-} from '../dtos/classes-response.dto';
-import { ClassesService } from '../services/classes.service';
+} from '../dtos';
+import { ClassesService } from '../services';
 
 @ApiTags('Classes')
 @ApiBearerAuth()

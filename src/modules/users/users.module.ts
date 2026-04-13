@@ -1,14 +1,16 @@
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
-import { REPOSITORY_TOKENS } from '../../common/constants/repository.tokens';
+import { REPOSITORY_TOKENS } from '../../common/constants';
 import { useUsersRepository } from '../../packages/infrastructure/repositories';
-import { DepartmentEntity } from '../../packages/infrastructure/entities/department.entity';
-import { FileEntity } from '../../packages/infrastructure/entities/file.entity';
-import { RoleEntity } from '../../packages/infrastructure/entities/role.entity';
-import { SpecializationEntity } from '../../packages/infrastructure/entities/specialization.entity';
-import { UserEntity } from '../../packages/infrastructure/entities/user.entity';
-import { UsersController } from './controllers/users.controller';
-import { UsersService } from './services/users.service';
+import {
+  DepartmentEntity,
+  FileEntity,
+  RoleEntity,
+  SpecializationEntity,
+  UserEntity,
+} from '../../packages/infrastructure/entities';
+import { UsersController } from './controllers';
+import { UsersService } from './services';
 
 @Module({
   imports: [

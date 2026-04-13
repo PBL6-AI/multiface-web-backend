@@ -1,15 +1,17 @@
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
-import { REPOSITORY_TOKENS } from '../../common/constants/repository.tokens';
-import { ClassEntity } from '../../packages/infrastructure/entities/class.entity';
-import { ClassMemberEntity } from '../../packages/infrastructure/entities/class-member.entity';
-import { ClassScheduleEntity } from '../../packages/infrastructure/entities/class-schedule.entity';
+import { REPOSITORY_TOKENS } from '../../common/constants';
+import {
+  ClassEntity,
+  ClassMemberEntity,
+  ClassScheduleEntity,
+  UserEntity,
+} from '../../packages/infrastructure/entities';
 import { useClassesRepository } from '../../packages/infrastructure/repositories';
-import { UserEntity } from '../../packages/infrastructure/entities/user.entity';
-import { AuthModule } from '../auth/auth.module';
-import { UsersModule } from '../users/users.module';
-import { ClassesController } from './controllers/classes.controller';
-import { ClassesService } from './services/classes.service';
+import { AuthModule } from '../auth';
+import { UsersModule } from '../users';
+import { ClassesController } from './controllers';
+import { ClassesService } from './services';
 
 @Module({
   imports: [

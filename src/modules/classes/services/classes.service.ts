@@ -6,21 +6,15 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { REPOSITORY_TOKENS } from '../../../common/constants/repository.tokens';
+import { REPOSITORY_TOKENS } from '../../../common/constants';
 import type {
   RawClassEntity,
   RawClassScheduleEntity,
-} from '../../../packages/domain/entities';
-import type {
   ClassesRepository,
   UpsertClassScheduleRecordInput,
-} from '../../../packages/domain/repositories';
-import type { AuthenticatedUser } from '../../auth/interfaces/authenticated-user.interface';
-import {
-  CreateClassDto,
-  JoinClassByCodeDto,
-  UpdateClassDto,
-} from '../dtos/classes-request.dto';
+} from '../../../packages/domain';
+import type { AuthenticatedUser } from '../../auth/interfaces';
+import { CreateClassDto, JoinClassByCodeDto, UpdateClassDto } from '../dtos';
 
 @Injectable()
 export class ClassesService {

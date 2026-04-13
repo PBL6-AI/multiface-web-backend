@@ -1,11 +1,11 @@
 import { getRepositoryToken } from '@nestjs/typeorm';
-import { REPOSITORY_TOKENS } from '../../../common/constants/repository.tokens';
+import { REPOSITORY_TOKENS } from '../../../common/constants';
 import { IsNull, Repository } from 'typeorm';
 import type {
   AuthRepository,
   CreateRefreshTokenRecordInput,
 } from '../../domain/repositories';
-import { RefreshTokenEntity } from '../entities/refresh-token.entity';
+import { RefreshTokenEntity } from '../entities';
 
 export class TypeOrmAuthRepository implements AuthRepository {
   constructor(

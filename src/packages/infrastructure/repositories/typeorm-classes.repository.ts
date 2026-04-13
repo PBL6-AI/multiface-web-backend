@@ -1,15 +1,17 @@
 import { getDataSourceToken, getRepositoryToken } from '@nestjs/typeorm';
-import { REPOSITORY_TOKENS } from '../../../common/constants/repository.tokens';
+import { REPOSITORY_TOKENS } from '../../../common/constants';
 import { DataSource, ILike, Repository } from 'typeorm';
 import type {
   ClassesRepository,
   CreateClassRecordInput,
   UpsertClassScheduleRecordInput,
 } from '../../domain/repositories';
-import { ClassEntity } from '../entities/class.entity';
-import { ClassMemberEntity } from '../entities/class-member.entity';
-import { ClassScheduleEntity } from '../entities/class-schedule.entity';
-import { UserEntity } from '../entities/user.entity';
+import {
+  ClassEntity,
+  ClassMemberEntity,
+  ClassScheduleEntity,
+  UserEntity,
+} from '../entities';
 
 export class TypeOrmClassesRepository implements ClassesRepository {
   constructor(

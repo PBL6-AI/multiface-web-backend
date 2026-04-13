@@ -2,14 +2,13 @@ import { Global, Module } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { JwtModule } from '@nestjs/jwt';
 import { TypeOrmModule } from '@nestjs/typeorm';
-import { durationToSeconds } from '../../common/utils/duration.util';
-import { AuthGuard } from '../../common/guards/auth.guard';
-import { RolesGuard } from '../../common/guards/roles.guard';
-import { RefreshTokenEntity } from '../../packages/infrastructure/entities/refresh-token.entity';
+import { AuthGuard, RolesGuard } from '../../common/guards';
+import { durationToSeconds } from '../../common/utils';
+import { RefreshTokenEntity } from '../../packages/infrastructure/entities';
 import { useAuthRepository } from '../../packages/infrastructure/repositories';
-import { UsersModule } from '../users/users.module';
-import { AuthController } from './controllers/auth.controller';
-import { AuthService } from './services/auth.service';
+import { UsersModule } from '../users';
+import { AuthController } from './controllers';
+import { AuthService } from './services';
 
 @Global()
 @Module({

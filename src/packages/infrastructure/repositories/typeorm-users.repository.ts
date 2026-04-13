@@ -1,16 +1,18 @@
 import { getRepositoryToken } from '@nestjs/typeorm';
-import { REPOSITORY_TOKENS } from '../../../common/constants/repository.tokens';
+import { REPOSITORY_TOKENS } from '../../../common/constants';
 import { ILike, Repository } from 'typeorm';
 import type {
   CreateRoleRecordInput,
   CreateUserRecordInput,
   UsersRepository,
 } from '../../domain/repositories';
-import { DepartmentEntity } from '../entities/department.entity';
-import { FileEntity } from '../entities/file.entity';
-import { RoleEntity } from '../entities/role.entity';
-import { SpecializationEntity } from '../entities/specialization.entity';
-import { UserEntity } from '../entities/user.entity';
+import {
+  DepartmentEntity,
+  FileEntity,
+  RoleEntity,
+  SpecializationEntity,
+  UserEntity,
+} from '../entities';
 
 export class TypeOrmUsersRepository implements UsersRepository {
   constructor(

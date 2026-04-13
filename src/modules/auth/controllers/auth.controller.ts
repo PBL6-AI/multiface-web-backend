@@ -13,25 +13,23 @@ import {
   ApiTags,
   ApiUnauthorizedResponse,
 } from '@nestjs/swagger';
-import { CurrentUser } from '../../../common/decorators/current-user.decorator';
-import { AuthGuard } from '../../../common/guards/auth.guard';
-import { ApiSuccessResponseDoc } from '../../../common/swagger/api-success-response.decorator';
+import { CurrentUser } from '../../../common/decorators';
+import { AuthGuard } from '../../../common/guards';
+import { ApiSuccessResponseDoc } from '../../../common/swagger';
+import type { ApiSuccessResponse } from '../../../common/types';
 import {
   LoginDto,
   LogoutDto,
   RefreshTokenDto,
   RegisterDto,
-} from '../dtos/auth-request.dto';
-import type { AuthenticatedUser } from '../interfaces/authenticated-user.interface';
-import { AuthService } from '../services/auth.service';
-import type { ApiSuccessResponse } from '../../../common/types';
-import {
   LoginResponseDto,
   LogoutResponseDto,
   RefreshTokenResponseDto,
   RegisterResponseDto,
-} from '../dtos/auth-response.dto';
-import { UserResponseDto } from '../../users/dtos/users-response.dto';
+} from '../dtos';
+import type { AuthenticatedUser } from '../interfaces';
+import { AuthService } from '../services';
+import { UserResponseDto } from '../../users/dtos';
 
 @ApiTags('Authentication')
 @Controller('auth')

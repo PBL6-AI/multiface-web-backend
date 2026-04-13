@@ -17,20 +17,18 @@ import {
   ApiUnauthorizedResponse,
 } from '@nestjs/swagger';
 import type { ApiSuccessResponse } from '../../../common/types';
-import { CurrentUser } from '../../../common/decorators/current-user.decorator';
-import { Roles } from '../../../common/decorators/roles.decorator';
-import { AuthGuard } from '../../../common/guards/auth.guard';
-import { RolesGuard } from '../../../common/guards/roles.guard';
-import { ApiSuccessResponseDoc } from '../../../common/swagger/api-success-response.decorator';
-import type { AuthenticatedUser } from '../../auth/interfaces/authenticated-user.interface';
+import { CurrentUser, Roles } from '../../../common/decorators';
+import { AuthGuard, RolesGuard } from '../../../common/guards';
+import { ApiSuccessResponseDoc } from '../../../common/swagger';
+import type { AuthenticatedUser } from '../../auth/interfaces';
 import {
   CreateUserDto,
   ListUsersQueryDto,
   UpdateProfileDto,
   UpdateUserDto,
-} from '../dtos/users-request.dto';
-import { UserResponseDto } from '../dtos/users-response.dto';
-import { UsersService } from '../services/users.service';
+  UserResponseDto,
+} from '../dtos';
+import { UsersService } from '../services';
 
 @ApiTags('Users')
 @ApiBearerAuth()
