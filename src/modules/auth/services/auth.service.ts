@@ -9,26 +9,27 @@ import { JwtService } from '@nestjs/jwt';
 import type {
   RawRefreshTokenEntity,
   RawUserEntity,
-} from '../../../packages/domain/entities';
-import type { AuthRepository } from '../../../packages/domain/repositories';
-import { REPOSITORY_TOKENS } from '../../../common/constants/repository.tokens';
-import { durationToSeconds } from '../../../common/utils/duration.util';
-import { hashSecret, verifySecret } from '../../../common/utils/hash.util';
-import { UsersService } from '../../users/services/users.service';
+  AuthRepository,
+} from '../../../packages/domain';
+import { REPOSITORY_TOKENS } from '../../../common/constants';
+import {
+  durationToSeconds,
+  hashSecret,
+  verifySecret,
+} from '../../../common/utils';
+import { UsersService } from '../../users/services';
 import {
   ChangePasswordDto,
   LoginDto,
   LogoutDto,
   RefreshTokenDto,
   RegisterDto,
-} from '../dtos/auth-request.dto';
-import {
   LoginResponseDto,
   LogoutResponseDto,
   RefreshTokenResponseDto,
   RegisterResponseDto,
-} from '../dtos/auth-response.dto';
-import type { UserResponseDto } from '../../users/dtos/users-response.dto';
+} from '../dtos';
+import { UserResponseDto } from '../../users/dtos';
 
 type JwtPayload = {
   sub: number;

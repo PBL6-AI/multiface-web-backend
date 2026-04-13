@@ -9,22 +9,22 @@ import {
 import type {
   RawRoleEntity,
   RawUserEntity,
-} from '../../../packages/domain/entities';
-import type { UsersRepository } from '../../../packages/domain/repositories';
-import { REPOSITORY_TOKENS } from '../../../common/constants/repository.tokens';
-import { hashSecret } from '../../../common/utils/hash.util';
+  UsersRepository,
+} from '../../../packages/domain';
+import { REPOSITORY_TOKENS } from '../../../common/constants';
+import { hashSecret } from '../../../common/utils';
 import {
   DEFAULT_STUDENT_ROLE,
   SYSTEM_ROLES,
   SystemRole,
 } from '../../auth/auth.constants';
-import { RegisterDto } from '../../auth/dtos/auth-request.dto';
+import { RegisterDto } from '../../auth/dtos';
 import {
   CreateUserDto,
   ListUsersQueryDto,
   UpdateProfileDto,
   UpdateUserDto,
-} from '../dtos/users-request.dto';
+} from '../dtos';
 
 type AcademicAssignment = {
   departmentId: number | null;

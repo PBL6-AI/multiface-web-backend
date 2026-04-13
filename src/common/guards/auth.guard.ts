@@ -9,13 +9,13 @@ import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
 import { Reflector } from '@nestjs/core';
 import { Request } from 'express';
-import { REPOSITORY_TOKENS } from '../constants/repository.tokens';
-import { IS_PUBLIC_KEY } from '../decorators/is-public.decorator';
-import type { UsersRepository } from '../../packages/domain/repositories';
+import { REPOSITORY_TOKENS } from '../constants';
+import { IS_PUBLIC_KEY } from '../decorators';
+import type { UsersRepository } from '../../packages/domain';
 import {
   AuthenticatedRequest,
   AuthenticatedUser,
-} from '../../modules/auth/interfaces/authenticated-user.interface';
+} from '../../modules/auth/interfaces';
 
 type JwtPayload = {
   sub: number;

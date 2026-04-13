@@ -1,29 +1,25 @@
-import { Injectable } from '@nestjs/common';
-import { InjectRepository } from '@nestjs/typeorm';
+import { getRepositoryToken } from '@nestjs/typeorm';
+import { REPOSITORY_TOKENS } from '../../../common/constants';
 import { ILike, Repository } from 'typeorm';
 import type {
   CreateRoleRecordInput,
   CreateUserRecordInput,
   UsersRepository,
 } from '../../domain/repositories';
-import { DepartmentEntity } from '../entities/department.entity';
-import { FileEntity } from '../entities/file.entity';
-import { RoleEntity } from '../entities/role.entity';
-import { SpecializationEntity } from '../entities/specialization.entity';
-import { UserEntity } from '../entities/user.entity';
+import {
+  DepartmentEntity,
+  FileEntity,
+  RoleEntity,
+  SpecializationEntity,
+  UserEntity,
+} from '../entities';
 
-@Injectable()
 export class TypeOrmUsersRepository implements UsersRepository {
   constructor(
-    @InjectRepository(UserEntity)
     private readonly usersRepository: Repository<UserEntity>,
-    @InjectRepository(RoleEntity)
     private readonly rolesRepository: Repository<RoleEntity>,
-    @InjectRepository(DepartmentEntity)
     private readonly departmentsRepository: Repository<DepartmentEntity>,
-    @InjectRepository(SpecializationEntity)
     private readonly specializationsRepository: Repository<SpecializationEntity>,
-    @InjectRepository(FileEntity)
     private readonly filesRepository: Repository<FileEntity>,
   ) {}
 
@@ -131,3 +127,28 @@ export class TypeOrmUsersRepository implements UsersRepository {
     specialization: true,
   } as const;
 }
+
+export const useUsersRepository = () => ({
+  provide: REPOSITORY_TOKENS.USERS,
+  useFactory: (
+    usersRepository: Repository<UserEntity>,
+    rolesRepository: Repository<RoleEntity>,
+    departmentsRepository: Repository<DepartmentEntity>,
+    specializationsRepository: Repository<SpecializationEntity>,
+    filesRepository: Repository<FileEntity>,
+  ) =>
+    new TypeOrmUsersRepository(
+      usersRepository,
+      rolesRepository,
+      departmentsRepository,
+      specializationsRepository,
+      filesRepository,
+    ),
+  inject: [
+    getRepositoryToken(UserEntity),
+    getRepositoryToken(RoleEntity),
+    getRepositoryToken(DepartmentEntity),
+    getRepositoryToken(SpecializationEntity),
+    getRepositoryToken(FileEntity),
+  ],
+});
