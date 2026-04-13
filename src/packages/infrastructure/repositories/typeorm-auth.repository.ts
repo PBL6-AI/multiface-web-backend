@@ -1,5 +1,5 @@
-import { Injectable } from '@nestjs/common';
-import { InjectRepository } from '@nestjs/typeorm';
+import { getRepositoryToken } from '@nestjs/typeorm';
+import { REPOSITORY_TOKENS } from '../../../common/constants/repository.tokens';
 import { IsNull, Repository } from 'typeorm';
 import type {
   AuthRepository,
@@ -7,10 +7,8 @@ import type {
 } from '../../domain/repositories';
 import { RefreshTokenEntity } from '../entities/refresh-token.entity';
 
-@Injectable()
 export class TypeOrmAuthRepository implements AuthRepository {
   constructor(
-    @InjectRepository(RefreshTokenEntity)
     private readonly refreshTokensRepository: Repository<RefreshTokenEntity>,
   ) {}
 
@@ -49,3 +47,10 @@ export class TypeOrmAuthRepository implements AuthRepository {
     );
   }
 }
+
+export const useAuthRepository = () => ({
+  provide: REPOSITORY_TOKENS.AUTH,
+  useFactory: (refreshTokensRepository: Repository<RefreshTokenEntity>) =>
+    new TypeOrmAuthRepository(refreshTokensRepository),
+  inject: [getRepositoryToken(RefreshTokenEntity)],
+});

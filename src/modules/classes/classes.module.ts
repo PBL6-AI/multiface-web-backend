@@ -4,7 +4,7 @@ import { REPOSITORY_TOKENS } from '../../common/constants/repository.tokens';
 import { ClassEntity } from '../../packages/infrastructure/entities/class.entity';
 import { ClassMemberEntity } from '../../packages/infrastructure/entities/class-member.entity';
 import { ClassScheduleEntity } from '../../packages/infrastructure/entities/class-schedule.entity';
-import { TypeOrmClassesRepository } from '../../packages/infrastructure/repositories';
+import { useClassesRepository } from '../../packages/infrastructure/repositories';
 import { UserEntity } from '../../packages/infrastructure/entities/user.entity';
 import { AuthModule } from '../auth/auth.module';
 import { UsersModule } from '../users/users.module';
@@ -23,14 +23,7 @@ import { ClassesService } from './services/classes.service';
     ]),
   ],
   controllers: [ClassesController],
-  providers: [
-    ClassesService,
-    TypeOrmClassesRepository,
-    {
-      provide: REPOSITORY_TOKENS.CLASSES,
-      useExisting: TypeOrmClassesRepository,
-    },
-  ],
+  providers: [ClassesService, useClassesRepository()],
   exports: [ClassesService, REPOSITORY_TOKENS.CLASSES],
 })
 export class ClassesModule {}

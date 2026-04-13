@@ -1,7 +1,7 @@
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { REPOSITORY_TOKENS } from '../../common/constants/repository.tokens';
-import { TypeOrmUsersRepository } from '../../packages/infrastructure/repositories';
+import { useUsersRepository } from '../../packages/infrastructure/repositories';
 import { DepartmentEntity } from '../../packages/infrastructure/entities/department.entity';
 import { FileEntity } from '../../packages/infrastructure/entities/file.entity';
 import { RoleEntity } from '../../packages/infrastructure/entities/role.entity';
@@ -21,14 +21,7 @@ import { UsersService } from './services/users.service';
     ]),
   ],
   controllers: [UsersController],
-  providers: [
-    UsersService,
-    TypeOrmUsersRepository,
-    {
-      provide: REPOSITORY_TOKENS.USERS,
-      useExisting: TypeOrmUsersRepository,
-    },
-  ],
+  providers: [UsersService, useUsersRepository()],
   exports: [UsersService, REPOSITORY_TOKENS.USERS],
 })
 export class UsersModule {}

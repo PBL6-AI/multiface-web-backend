@@ -1,5 +1,5 @@
-import { Injectable } from '@nestjs/common';
-import { InjectDataSource, InjectRepository } from '@nestjs/typeorm';
+import { getDataSourceToken, getRepositoryToken } from '@nestjs/typeorm';
+import { REPOSITORY_TOKENS } from '../../../common/constants/repository.tokens';
 import { DataSource, ILike, Repository } from 'typeorm';
 import type {
   ClassesRepository,
@@ -11,18 +11,12 @@ import { ClassMemberEntity } from '../entities/class-member.entity';
 import { ClassScheduleEntity } from '../entities/class-schedule.entity';
 import { UserEntity } from '../entities/user.entity';
 
-@Injectable()
 export class TypeOrmClassesRepository implements ClassesRepository {
   constructor(
-    @InjectDataSource()
     private readonly dataSource: DataSource,
-    @InjectRepository(ClassEntity)
     private readonly classesRepository: Repository<ClassEntity>,
-    @InjectRepository(ClassMemberEntity)
     private readonly classMembersRepository: Repository<ClassMemberEntity>,
-    @InjectRepository(ClassScheduleEntity)
     private readonly classSchedulesRepository: Repository<ClassScheduleEntity>,
-    @InjectRepository(UserEntity)
     private readonly usersRepository: Repository<UserEntity>,
   ) {}
 
@@ -208,3 +202,28 @@ export class TypeOrmClassesRepository implements ClassesRepository {
     },
   } as const;
 }
+
+export const useClassesRepository = () => ({
+  provide: REPOSITORY_TOKENS.CLASSES,
+  useFactory: (
+    dataSource: DataSource,
+    classesRepository: Repository<ClassEntity>,
+    classMembersRepository: Repository<ClassMemberEntity>,
+    classSchedulesRepository: Repository<ClassScheduleEntity>,
+    usersRepository: Repository<UserEntity>,
+  ) =>
+    new TypeOrmClassesRepository(
+      dataSource,
+      classesRepository,
+      classMembersRepository,
+      classSchedulesRepository,
+      usersRepository,
+    ),
+  inject: [
+    getDataSourceToken(),
+    getRepositoryToken(ClassEntity),
+    getRepositoryToken(ClassMemberEntity),
+    getRepositoryToken(ClassScheduleEntity),
+    getRepositoryToken(UserEntity),
+  ],
+});
