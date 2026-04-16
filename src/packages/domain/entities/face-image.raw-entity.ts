@@ -1,4 +1,4 @@
-import { ApprovalStatus } from '../../../common/domain/enums';
+import { ApprovalStatus, FaceImagePose } from '../../../common/domain/enums';
 import type { RawFaceEmbeddingEntity } from './face-embedding.raw-entity';
 import type { RawFaceRegistrationRequestEntity } from './face-registration-request.raw-entity';
 import type { RawFileEntity } from './file.raw-entity';
@@ -10,6 +10,7 @@ export interface RawFaceImageEntity {
   requestId: number;
   fileId: number;
   alignedFileId: number | null;
+  pose: FaceImagePose;
   status: ApprovalStatus;
   reviewedById: number | null;
   reviewedAt: Date | null;
