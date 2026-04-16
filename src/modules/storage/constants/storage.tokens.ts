@@ -1,0 +1,3 @@
+export const STORAGE_TOKENS = {
+  CLOUD_STORAGE: 'CLOUD_STORAGE_SERVICE',
+} as const;
