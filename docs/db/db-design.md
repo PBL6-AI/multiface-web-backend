@@ -1,5 +1,20 @@
 # Multiface Backend Database Design
 
+This document is primarily for backend, data, infra, and QA contributors who need to understand how the current database schema supports the application.
+
+Use this document when you need table-level detail. For other viewpoints:
+- API consumers should start with [`../api/api-doc.md`](../api/api-doc.md)
+- New contributors should start with [`../overview/system-overview.md`](../overview/system-overview.md)
+- Local environment setup is documented in [`../dev/local-setup.md`](../dev/local-setup.md)
+
+At a high level, the currently active NestJS modules map to the schema like this:
+- `auth` + `users`: users, roles, permissions, refresh tokens, departments, specializations
+- `classes`: classes, members, schedules
+- `files`: file metadata persisted in the `files` table
+- `faces`: face registration requests and face images
+
+Some additional schema areas described below represent broader product scope and future-facing structure, so always verify runtime exposure against `src/app.module.ts` and Swagger before assuming a table is already backed by a public API.
+
 ## 1. Scope and Source of Truth
 
 This document describes the current relational database design used by the backend.
