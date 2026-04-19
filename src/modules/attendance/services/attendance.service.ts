@@ -132,7 +132,7 @@ export class AttendanceService {
       pendingCount:
         session.classEntity.classMembers.length - recognizedStudents.length,
       recognitionEventCount: session.recognitionEvents.length,
-      unknownFaceCount: session.unknownFaces.length,
+      unknownFaceCount: session.unknownFaces?.length ?? 0,
       recentEvents: [...session.recognitionEvents]
         .sort(
           (left, right) => right.createdAt.getTime() - left.createdAt.getTime(),
