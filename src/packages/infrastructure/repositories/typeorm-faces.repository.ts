@@ -1,21 +1,28 @@
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { REPOSITORY_TOKENS } from '../../../common/constants';
 import { ApprovalStatus, FaceImagePose } from '../../../common/domain/enums';
-import { Repository } from 'typeorm';
+import { In, Repository } from 'typeorm';
 import type {
   CreateFaceImageRecordInput,
+  CreateFaceEmbeddingRecordInput,
   CreateFaceRegistrationRequestRecordInput,
   FacesRepository,
   ListFaceRegistrationRequestsOptions,
+  RawFaceEmbeddingEntity,
   RawFaceImageEntity,
   RawFaceRegistrationRequestEntity,
 } from '../../domain';
-import { FaceImageEntity, FaceRegistrationRequestEntity } from '../entities';
+import {
+  FaceEmbeddingEntity,
+  FaceImageEntity,
+  FaceRegistrationRequestEntity,
+} from '../entities';
 
 export class TypeOrmFacesRepository implements FacesRepository {
   constructor(
     private readonly faceRegistrationRequestsRepository: Repository<FaceRegistrationRequestEntity>,
     private readonly faceImagesRepository: Repository<FaceImageEntity>,
+    private readonly faceEmbeddingsRepository: Repository<FaceEmbeddingEntity>,
   ) {}
 
   async findRequestById(
@@ -142,6 +149,38 @@ export class TypeOrmFacesRepository implements FacesRepository {
     return this.faceImagesRepository.save(images);
   }
 
+  async createEmbeddings(
+    inputs: CreateFaceEmbeddingRecordInput[],
+  ): Promise<RawFaceEmbeddingEntity[]> {
+    return this.faceEmbeddingsRepository.save(
+      inputs.map((input) =>
+        this.faceEmbeddingsRepository.create({
+          studentId: input.studentId,
+          faceImageId: input.faceImageId,
+          embedding: input.embedding,
+          modelName: input.modelName,
+          modelVersion: input.modelVersion,
+          distanceMetric: input.distanceMetric,
+          embeddingDimension: input.embeddingDimension,
+          isActive: input.isActive,
+          preprocessProfile: input.preprocessProfile,
+          isL2Normalized: input.isL2Normalized,
+          metadata: input.metadata ?? null,
+        }),
+      ),
+    );
+  }
+
+  async deleteEmbeddingsByFaceImageIds(faceImageIds: number[]): Promise<void> {
+    if (!faceImageIds.length) {
+      return;
+    }
+
+    await this.faceEmbeddingsRepository.delete({
+      faceImageId: In(faceImageIds),
+    });
+  }
+
   private readonly requestRelations = {
     student: {
       role: true,
@@ -152,6 +191,7 @@ export class TypeOrmFacesRepository implements FacesRepository {
     faceImages: {
       file: true,
       alignedFile: true,
+      embeddings: true,
       reviewedBy: {
         role: true,
       },
@@ -172,13 +212,16 @@ export const useFacesRepository = () => ({
   useFactory: (
     faceRegistrationRequestsRepository: Repository<FaceRegistrationRequestEntity>,
     faceImagesRepository: Repository<FaceImageEntity>,
+    faceEmbeddingsRepository: Repository<FaceEmbeddingEntity>,
   ) =>
     new TypeOrmFacesRepository(
       faceRegistrationRequestsRepository,
       faceImagesRepository,
+      faceEmbeddingsRepository,
     ),
   inject: [
     getRepositoryToken(FaceRegistrationRequestEntity),
     getRepositoryToken(FaceImageEntity),
+    getRepositoryToken(FaceEmbeddingEntity),
   ],
 });

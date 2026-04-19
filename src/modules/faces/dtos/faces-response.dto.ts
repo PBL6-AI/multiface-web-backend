@@ -50,6 +50,12 @@ export class FaceRegistrationImageResponseDto {
   createdAt: Date;
 
   @ApiProperty({
+    description: 'Embedding generation status for this face image',
+    example: 'completed',
+  })
+  embeddingStatus: string;
+
+  @ApiProperty({
     description: 'Uploaded raw file metadata for this face image',
     type: UploadedFileResponseDto,
   })
@@ -114,6 +120,24 @@ export class FaceRegistrationRequestResponseDto {
     example: 5,
   })
   requiredPoseCount: number;
+
+  @ApiProperty({
+    description: 'Number of approved pose images that already have embeddings',
+    example: 5,
+  })
+  embeddedPoseCount: number;
+
+  @ApiProperty({
+    description: 'Number of embeddings expected before the template is ready',
+    example: 5,
+  })
+  requiredEmbeddingCount: number;
+
+  @ApiProperty({
+    description: 'Overall embedding pipeline status for the request',
+    example: 'completed',
+  })
+  embeddingStatus: string;
 
   @ApiProperty({
     description: 'Poses that have already been uploaded',

@@ -1,5 +1,6 @@
 import { ApprovalStatus, FaceImagePose } from '../../../common/domain/enums';
 import type {
+  RawFaceEmbeddingEntity,
   RawFaceImageEntity,
   RawFaceRegistrationRequestEntity,
 } from '../entities';
@@ -30,6 +31,20 @@ export type ListFaceRegistrationRequestsOptions = {
   studentId?: number;
 };
 
+export type CreateFaceEmbeddingRecordInput = {
+  studentId: number;
+  faceImageId: number;
+  embedding: number[];
+  modelName: string;
+  modelVersion: string;
+  distanceMetric: string;
+  embeddingDimension: number;
+  isActive: boolean;
+  preprocessProfile: string;
+  isL2Normalized: boolean;
+  metadata?: Record<string, unknown> | null;
+};
+
 export interface FacesRepository {
   findRequestById(
     requestId: number,
@@ -58,4 +73,8 @@ export interface FacesRepository {
     request: RawFaceRegistrationRequestEntity,
   ): Promise<RawFaceRegistrationRequestEntity>;
   saveImages(images: RawFaceImageEntity[]): Promise<RawFaceImageEntity[]>;
+  createEmbeddings(
+    inputs: CreateFaceEmbeddingRecordInput[],
+  ): Promise<RawFaceEmbeddingEntity[]>;
+  deleteEmbeddingsByFaceImageIds(faceImageIds: number[]): Promise<void>;
 }
