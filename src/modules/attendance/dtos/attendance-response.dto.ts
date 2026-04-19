@@ -45,6 +45,20 @@ export class AttendanceRecordResponseDto {
     example: '2026-04-19T09:05:30.000Z',
   })
   recordedAt: Date;
+
+  @ApiPropertyOptional({
+    description: 'Student full name for dashboard rendering',
+    example: 'Nguyen Van A',
+    nullable: true,
+  })
+  fullName?: string | null;
+
+  @ApiPropertyOptional({
+    description: 'Student user code for dashboard rendering',
+    example: 'SV001',
+    nullable: true,
+  })
+  userCode?: string | null;
 }
 
 export class AttendanceSessionResponseDto {
@@ -166,4 +180,209 @@ export class AttendanceActionMessageResponseDto {
     example: 'Attendance session closed successfully',
   })
   message: string;
+}
+
+export class AttendanceSessionLiveEventResponseDto {
+  @ApiProperty({
+    description: 'Recognition event identifier',
+    example: 5001,
+  })
+  id: number;
+
+  @ApiProperty({
+    description: 'Frame identifier',
+    example: 'frame-demo-001',
+  })
+  frameId: string;
+
+  @ApiPropertyOptional({
+    description: 'Detected student identifier',
+    example: 42,
+    nullable: true,
+  })
+  detectedStudentId: number | null;
+
+  @ApiPropertyOptional({
+    description: 'Detected student name when recognition succeeded',
+    example: 'Nguyen Van A',
+    nullable: true,
+  })
+  detectedStudentName: string | null;
+
+  @ApiPropertyOptional({
+    description: 'Recognition confidence score',
+    example: 0.92,
+    nullable: true,
+  })
+  confidenceScore: number | null;
+
+  @ApiPropertyOptional({
+    description: 'Recognition similarity score',
+    example: 0.87,
+    nullable: true,
+  })
+  similarityScore: number | null;
+
+  @ApiProperty({
+    description: 'Whether the face was considered real by anti-spoofing',
+    example: true,
+  })
+  isRealFace: boolean;
+
+  @ApiProperty({
+    description: 'Recognition event creation timestamp',
+    example: '2026-04-19T09:05:30.000Z',
+  })
+  createdAt: Date;
+}
+
+export class AttendanceSessionLiveSnapshotResponseDto {
+  @ApiProperty({
+    description: 'Attendance session identifier',
+    example: 91,
+  })
+  sessionId: number;
+
+  @ApiProperty({
+    description: 'Current session status',
+    enum: AttendanceSessionStatus,
+    example: AttendanceSessionStatus.ACTIVE,
+  })
+  status: AttendanceSessionStatus;
+
+  @ApiProperty({
+    description: 'Total students enrolled in the class',
+    example: 30,
+  })
+  totalStudents: number;
+
+  @ApiProperty({
+    description: 'Total students marked present',
+    example: 18,
+  })
+  presentCount: number;
+
+  @ApiProperty({
+    description: 'Students still pending attendance',
+    example: 12,
+  })
+  pendingCount: number;
+
+  @ApiProperty({
+    description: 'Total recognition events recorded in the session',
+    example: 24,
+  })
+  recognitionEventCount: number;
+
+  @ApiProperty({
+    description: 'Unknown face count recorded in the session',
+    example: 0,
+  })
+  unknownFaceCount: number;
+
+  @ApiProperty({
+    description: 'Recent recognition events for live monitoring',
+    type: AttendanceSessionLiveEventResponseDto,
+    isArray: true,
+  })
+  recentEvents: AttendanceSessionLiveEventResponseDto[];
+
+  @ApiProperty({
+    description: 'Students recognized in the session',
+    type: AttendanceRecordResponseDto,
+    isArray: true,
+  })
+  recognizedStudents: AttendanceRecordResponseDto[];
+}
+
+export class AttendanceDashboardOverviewResponseDto {
+  @ApiProperty({
+    description: 'Role-specific overview scope',
+    example: 'teacher',
+  })
+  scope: string;
+
+  @ApiProperty({
+    description: 'Number of active sessions visible to the current user',
+    example: 1,
+  })
+  activeSessionCount: number;
+
+  @ApiProperty({
+    description: 'Number of classes visible to the current user',
+    example: 3,
+  })
+  classCount: number;
+
+  @ApiProperty({
+    description: 'Number of present attendance records across visible sessions',
+    example: 42,
+  })
+  presentRecordCount: number;
+
+  @ApiProperty({
+    description: 'Number of pending attendance records across visible sessions',
+    example: 8,
+  })
+  pendingRecordCount: number;
+
+  @ApiProperty({
+    description: 'Total recognition events across visible sessions',
+    example: 67,
+  })
+  recognitionEventCount: number;
+
+  @ApiProperty({
+    description: 'Recent sessions for dashboard cards',
+    type: AttendanceSessionResponseDto,
+    isArray: true,
+  })
+  recentSessions: AttendanceSessionResponseDto[];
+}
+
+export class StudentAttendanceHistoryResponseDto {
+  @ApiProperty({
+    description: 'Attendance session identifier',
+    example: 91,
+  })
+  sessionId: number;
+
+  @ApiProperty({
+    description: 'Class identifier',
+    example: 12,
+  })
+  classId: number;
+
+  @ApiProperty({
+    description: 'Class name',
+    example: 'SE304',
+  })
+  className: string;
+
+  @ApiProperty({
+    description: 'Attendance status in the session',
+    enum: AttendanceRecordStatus,
+    example: AttendanceRecordStatus.PRESENT,
+  })
+  status: AttendanceRecordStatus;
+
+  @ApiPropertyOptional({
+    description: 'Confidence score if attendance was created from recognition',
+    example: 0.89,
+    nullable: true,
+  })
+  confidenceScore: number | null;
+
+  @ApiProperty({
+    description: 'Session start time',
+    example: '2026-04-19T09:00:00.000Z',
+  })
+  startTime: Date;
+
+  @ApiPropertyOptional({
+    description: 'Recorded time of the attendance mark',
+    example: '2026-04-19T09:05:30.000Z',
+    nullable: true,
+  })
+  recordedAt: Date | null;
 }

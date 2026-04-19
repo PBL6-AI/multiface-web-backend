@@ -16,7 +16,12 @@ import type {
   AttendanceRepository,
   RawAttendanceSessionEntity,
 } from '../../../packages/domain';
-import { IngestRecognitionEventDto, CreateAttendanceSessionDto } from '../dtos';
+import {
+  ActiveAttendanceSessionQueryDto,
+  CreateAttendanceSessionDto,
+  IngestRecognitionEventDto,
+  MockAttendanceSessionFeedDto,
+} from '../dtos';
 import type { AuthenticatedUser } from '../../auth/interfaces';
 
 @Injectable()
@@ -73,11 +78,145 @@ export class AttendanceService {
       .map((session) => this.serializeSession(session));
   }
 
+  async getActiveSession(
+    currentUser: AuthenticatedUser,
+    query: ActiveAttendanceSessionQueryDto = {},
+  ) {
+    const sessions = await this.attendanceRepository.listSessions();
+    const session =
+      sessions.find(
+        (item) =>
+          item.status === AttendanceSessionStatus.ACTIVE &&
+          (query.classId ? item.classId === query.classId : true) &&
+          this.canAccessSession(currentUser, item),
+      ) ?? null;
+
+    return session ? this.serializeSession(session) : null;
+  }
+
   async getSessionById(currentUser: AuthenticatedUser, sessionId: number) {
     const session = await this.findSessionOrThrow(sessionId);
     this.ensureCanAccessSession(currentUser, session);
 
     return this.serializeSession(session);
+  }
+
+  async getSessionLiveSnapshot(
+    currentUser: AuthenticatedUser,
+    sessionId: number,
+  ) {
+    const session = await this.findSessionOrThrow(sessionId);
+    this.ensureCanAccessSession(currentUser, session);
+
+    const recognizedStudents = session.records
+      .filter((record) => record.status === AttendanceRecordStatus.PRESENT)
+      .sort(
+        (left, right) => right.recordedAt.getTime() - left.recordedAt.getTime(),
+      )
+      .map((record) => ({
+        id: record.id,
+        studentId: record.studentId,
+        status: record.status,
+        confidenceScore: record.confidenceScore,
+        recognitionEventId: record.recognitionEventId,
+        recordedAt: record.recordedAt,
+        fullName: record.student.fullName,
+        userCode: record.student.userCode,
+      }));
+
+    return {
+      sessionId: session.id,
+      status: session.status,
+      totalStudents: session.classEntity.classMembers.length,
+      presentCount: recognizedStudents.length,
+      pendingCount:
+        session.classEntity.classMembers.length - recognizedStudents.length,
+      recognitionEventCount: session.recognitionEvents.length,
+      unknownFaceCount: session.unknownFaces.length,
+      recentEvents: [...session.recognitionEvents]
+        .sort(
+          (left, right) => right.createdAt.getTime() - left.createdAt.getTime(),
+        )
+        .slice(0, 10)
+        .map((event) => ({
+          id: event.id,
+          frameId: event.frameId,
+          detectedStudentId: event.detectedStudentId,
+          detectedStudentName: event.detectedStudent?.fullName ?? null,
+          confidenceScore: event.confidenceScore,
+          similarityScore: event.similarityScore,
+          isRealFace: event.isRealFace,
+          createdAt: event.createdAt,
+        })),
+      recognizedStudents,
+    };
+  }
+
+  async getDashboardOverview(currentUser: AuthenticatedUser) {
+    const visibleSessions = (
+      await this.attendanceRepository.listSessions()
+    ).filter((session) => this.canAccessSession(currentUser, session));
+    const recentSessions = visibleSessions
+      .slice()
+      .sort(
+        (left, right) => right.startTime.getTime() - left.startTime.getTime(),
+      )
+      .slice(0, 5)
+      .map((session) => this.serializeSession(session));
+
+    return {
+      scope: currentUser.role,
+      activeSessionCount: visibleSessions.filter(
+        (session) => session.status === AttendanceSessionStatus.ACTIVE,
+      ).length,
+      classCount: new Set(visibleSessions.map((session) => session.classId))
+        .size,
+      presentRecordCount: visibleSessions.reduce(
+        (total, session) =>
+          total +
+          session.records.filter(
+            (record) => record.status === AttendanceRecordStatus.PRESENT,
+          ).length,
+        0,
+      ),
+      pendingRecordCount: visibleSessions.reduce(
+        (total, session) =>
+          total +
+          session.records.filter(
+            (record) => record.status === AttendanceRecordStatus.PENDING,
+          ).length,
+        0,
+      ),
+      recognitionEventCount: visibleSessions.reduce(
+        (total, session) => total + session.recognitionEvents.length,
+        0,
+      ),
+      recentSessions,
+    };
+  }
+
+  async getStudentAttendanceHistory(currentUser: AuthenticatedUser) {
+    const visibleSessions = (
+      await this.attendanceRepository.listSessions()
+    ).filter((session) => this.canAccessSession(currentUser, session));
+
+    return visibleSessions
+      .flatMap((session) =>
+        session.records
+          .filter((record) => record.studentId === currentUser.id)
+          .map((record) => ({
+            sessionId: session.id,
+            classId: session.classId,
+            className: session.classEntity.className,
+            status: record.status,
+            confidenceScore: record.confidenceScore,
+            startTime: session.startTime,
+            recordedAt: record.recordedAt,
+          })),
+      )
+      .sort(
+        (left, right) => right.startTime.getTime() - left.startTime.getTime(),
+      );
   }
 
   async closeSession(currentUser: AuthenticatedUser, sessionId: number) {
@@ -149,6 +288,60 @@ export class AttendanceService {
       attendanceRecordId: decision.attendanceRecordId,
       decision: decision.decision,
       reason: decision.reason,
+    };
+  }
+
+  async generateMockSessionFeed(
+    currentUser: AuthenticatedUser,
+    sessionId: number,
+    mockAttendanceSessionFeedDto: MockAttendanceSessionFeedDto,
+  ) {
+    const session = await this.findSessionOrThrow(sessionId);
+    this.ensureCanManageSession(currentUser, session.classEntity.teacherId);
+
+    if (session.status !== AttendanceSessionStatus.ACTIVE) {
+      throw new ConflictException(
+        'Mock feed can only be generated for active attendance sessions',
+      );
+    }
+
+    const recognizedCount = mockAttendanceSessionFeedDto.recognizedCount ?? 5;
+    const sourceDeviceId =
+      mockAttendanceSessionFeedDto.sourceDeviceId ?? 'pi-main-01';
+
+    const remainingStudents = session.classEntity.classMembers
+      .filter(
+        (member) =>
+          !session.records.some(
+            (record) => record.studentId === member.studentId,
+          ),
+      )
+      .slice(0, recognizedCount);
+
+    for (const [index, member] of remainingStudents.entries()) {
+      await this.ingestRecognitionEvent(sessionId, {
+        sourceDeviceId,
+        frameId: `mock-frame-${Date.now()}-${index + 1}`,
+        candidateUserId: member.studentId,
+        confidenceScore: 0.88 + (index % 5) * 0.02,
+        similarityScore: 0.82 + (index % 4) * 0.02,
+        isRealFace: true,
+        antiSpoofingScore: 0.96,
+        detectorModel: 'scrfd_500m',
+        detectorModelVersion: 'mock',
+        recognitionModel: 'edgeface_xxs',
+        recognitionModelVersion: '1',
+        antiSpoofingModel: 'mock_liveness_v1',
+        antiSpoofingModelVersion: '1',
+        metadata: {
+          source: 'mock_dashboard_feed',
+          studentName: member.student.fullName,
+        },
+      });
+    }
+
+    return {
+      message: 'Mock attendance feed generated successfully',
     };
   }
 
@@ -262,6 +455,8 @@ export class AttendanceService {
         confidenceScore: record.confidenceScore,
         recognitionEventId: record.recognitionEventId,
         recordedAt: record.recordedAt,
+        fullName: record.student.fullName,
+        userCode: record.student.userCode,
       })),
     };
   }

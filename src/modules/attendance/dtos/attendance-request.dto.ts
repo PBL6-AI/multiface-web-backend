@@ -209,3 +209,35 @@ export class ListAttendanceSessionsQueryDto {
   @IsEnum(AttendanceSessionStatus)
   status?: AttendanceSessionStatus;
 }
+
+export class ActiveAttendanceSessionQueryDto {
+  @ApiPropertyOptional({
+    description:
+      'Optional class identifier used to narrow down the active session',
+    example: 12,
+  })
+  @IsOptional()
+  @IsNumber()
+  classId?: number;
+}
+
+export class MockAttendanceSessionFeedDto {
+  @ApiPropertyOptional({
+    description: 'Number of recognized students to simulate for the session',
+    example: 5,
+    default: 5,
+  })
+  @IsOptional()
+  @IsNumber()
+  @Min(1)
+  @Max(20)
+  recognizedCount?: number;
+
+  @ApiPropertyOptional({
+    description: 'Mock source device identifier',
+    example: 'pi-main-01',
+  })
+  @IsOptional()
+  @IsString()
+  sourceDeviceId?: string;
+}
