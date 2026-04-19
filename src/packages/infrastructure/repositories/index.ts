@@ -1,3 +1,4 @@
+export * from './typeorm-attendance.repository';
 export * from './typeorm-auth.repository';
 export * from './typeorm-classes.repository';
 export * from './typeorm-faces.repository';

@@ -7,4 +7,7 @@ export default () => ({
     accessTokenExpiresIn: process.env.JWT_ACCESS_EXPIRES_IN ?? '15m',
     refreshTokenExpiresIn: process.env.JWT_REFRESH_EXPIRES_IN ?? '7d',
   },
+  edge: {
+    ingestToken: process.env.EDGE_INGEST_TOKEN ?? '',
+  },
 });

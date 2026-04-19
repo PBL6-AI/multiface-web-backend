@@ -13,6 +13,8 @@ import type {
   RawFaceImageEntity,
   RawFaceRegistrationRequestEntity,
 } from '../../../packages/domain';
+import { AI_PROVIDER_TOKEN } from '../../ai-integration';
+import type { FaceAiProvider } from '../../ai-integration';
 import type { AuthenticatedUser } from '../../auth/interfaces';
 import { FilesService } from '../../files/services';
 import {
@@ -35,6 +37,8 @@ export class FacesService {
     @Inject(REPOSITORY_TOKENS.FACES)
     private readonly facesRepository: FacesRepository,
     private readonly filesService: FilesService,
+    @Inject(AI_PROVIDER_TOKEN)
+    private readonly aiProvider: FaceAiProvider,
   ) {}
 
   async createRequest(
@@ -225,11 +229,24 @@ export class FacesService {
         reviewFaceRegistrationRequestDto.status === ApprovalStatus.REJECTED
           ? rejectionReason
           : null,
+      metadata:
+        reviewFaceRegistrationRequestDto.status === ApprovalStatus.APPROVED
+          ? this.withEmbeddingMetadata(image, {
+              status: 'queued',
+              updatedAt: reviewedAt.toISOString(),
+            })
+          : image.metadata,
     }));
 
     await this.facesRepository.saveImages(reviewedImages);
 
-    const updatedRequest = await this.facesRepository.saveRequest(request);
+    await this.facesRepository.saveRequest(request);
+
+    if (reviewFaceRegistrationRequestDto.status === ApprovalStatus.APPROVED) {
+      await this.processEmbeddingsForApprovedRequest(request.id);
+    }
+
+    const updatedRequest = await this.findRequestOrThrow(requestId);
 
     return this.serializeRequest(updatedRequest);
   }
@@ -250,6 +267,12 @@ export class FacesService {
     const missingPoses = FACE_REGISTRATION_REQUIRED_POSES.filter(
       (pose) => !completedPoses.includes(pose),
     );
+    const approvedImages = sortedImages.filter(
+      (image) => image.status === ApprovalStatus.APPROVED,
+    );
+    const embeddedImages = approvedImages.filter(
+      (image) => image.embeddings.length > 0,
+    );
 
     return {
       id: request.id,
@@ -261,6 +284,12 @@ export class FacesService {
       createdAt: request.createdAt,
       uploadedPoseCount: sortedImages.length,
       requiredPoseCount: FACE_REGISTRATION_REQUIRED_POSES.length,
+      embeddedPoseCount: embeddedImages.length,
+      requiredEmbeddingCount: FACE_REGISTRATION_REQUIRED_POSES.length,
+      embeddingStatus: this.resolveRequestEmbeddingStatus(
+        request,
+        approvedImages,
+      ),
       completedPoses,
       missingPoses,
       images: sortedImages.map((image) => this.serializeImage(image)),
@@ -276,6 +305,7 @@ export class FacesService {
       capturedAt: image.capturedAt,
       qualityScore: image.qualityScore,
       createdAt: image.createdAt,
+      embeddingStatus: this.resolveImageEmbeddingStatus(image),
       file: this.filesService.serializeUploadedFile(image.file),
     };
   }
@@ -294,5 +324,165 @@ export class FacesService {
 
   private poseOrder(pose: FaceImagePose): number {
     return FACE_REGISTRATION_REQUIRED_POSES.indexOf(pose);
+  }
+
+  private async processEmbeddingsForApprovedRequest(
+    requestId: number,
+  ): Promise<void> {
+    const request = await this.findRequestOrThrow(requestId);
+    const approvedImages = request.faceImages.filter(
+      (image) => image.status === ApprovalStatus.APPROVED,
+    );
+
+    if (!approvedImages.length) {
+      return;
+    }
+
+    try {
+      const result = await this.aiProvider.generateFaceEmbeddings({
+        requestId: request.id,
+        studentId: request.studentId,
+        images: approvedImages.map((image) => ({
+          faceImageId: image.id,
+          fileKey: image.file.fileKey,
+          pose: image.pose,
+        })),
+      });
+
+      await this.facesRepository.deleteEmbeddingsByFaceImageIds(
+        approvedImages.map((image) => image.id),
+      );
+      await this.facesRepository.createEmbeddings(
+        result.embeddings.map((embedding) => ({
+          studentId: request.studentId,
+          faceImageId: embedding.faceImageId,
+          embedding: embedding.embedding,
+          modelName: embedding.modelName,
+          modelVersion: embedding.modelVersion,
+          distanceMetric: embedding.distanceMetric,
+          embeddingDimension: embedding.embeddingDimension,
+          isActive: embedding.isActive,
+          preprocessProfile: embedding.preprocessProfile,
+          isL2Normalized: embedding.isL2Normalized,
+          metadata: embedding.metadata ?? null,
+        })),
+      );
+
+      const processedImages = approvedImages.map((image) => {
+        const embedding = result.embeddings.find(
+          (item) => item.faceImageId === image.id,
+        );
+
+        return {
+          ...image,
+          metadata: this.withEmbeddingMetadata(image, {
+            status: embedding ? 'completed' : 'failed',
+            updatedAt: new Date().toISOString(),
+            modelName: embedding?.modelName ?? null,
+            modelVersion: embedding?.modelVersion ?? null,
+          }),
+        };
+      });
+
+      await this.facesRepository.saveImages(processedImages);
+    } catch (error) {
+      const failedImages = approvedImages.map((image) => ({
+        ...image,
+        metadata: this.withEmbeddingMetadata(image, {
+          status: 'failed',
+          updatedAt: new Date().toISOString(),
+          reason:
+            error instanceof Error
+              ? error.message
+              : 'Unknown embedding generation error',
+        }),
+      }));
+
+      await this.facesRepository.saveImages(failedImages);
+    }
+  }
+
+  private resolveRequestEmbeddingStatus(
+    request: RawFaceRegistrationRequestEntity,
+    approvedImages: RawFaceImageEntity[],
+  ): string {
+    if (request.status === ApprovalStatus.REJECTED) {
+      return 'not_available';
+    }
+
+    if (request.status !== ApprovalStatus.APPROVED) {
+      return 'not_requested';
+    }
+
+    if (!approvedImages.length) {
+      return 'queued';
+    }
+
+    const statuses = approvedImages.map((image) =>
+      this.resolveImageEmbeddingStatus(image),
+    );
+
+    if (statuses.every((status) => status === 'completed')) {
+      return 'completed';
+    }
+
+    if (statuses.some((status) => status === 'failed')) {
+      return 'partial_failed';
+    }
+
+    if (statuses.some((status) => status === 'completed')) {
+      return 'processing';
+    }
+
+    return 'queued';
+  }
+
+  private resolveImageEmbeddingStatus(image: RawFaceImageEntity): string {
+    if (image.embeddings.length > 0) {
+      return 'completed';
+    }
+
+    const metadata = image.metadata;
+    const embeddingMetadata =
+      metadata && typeof metadata === 'object' && 'embedding' in metadata
+        ? metadata.embedding
+        : null;
+
+    if (embeddingMetadata && typeof embeddingMetadata === 'object') {
+      const status =
+        'status' in embeddingMetadata ? embeddingMetadata.status : null;
+
+      if (typeof status === 'string') {
+        return status;
+      }
+    }
+
+    return image.status === ApprovalStatus.APPROVED
+      ? 'queued'
+      : 'not_requested';
+  }
+
+  private withEmbeddingMetadata(
+    image: RawFaceImageEntity,
+    payload: Record<string, unknown>,
+  ): Record<string, unknown> {
+    const existingMetadata =
+      image.metadata && typeof image.metadata === 'object'
+        ? image.metadata
+        : {};
+    const existingEmbeddingMetadata =
+      'embedding' in existingMetadata &&
+      existingMetadata.embedding &&
+      typeof existingMetadata.embedding === 'object'
+        ? (existingMetadata.embedding as Record<string, unknown>)
+        : {};
+
+    return {
+      ...existingMetadata,
+      embedding: {
+        ...existingEmbeddingMetadata,
+        ...payload,
+      },
+    };
   }
 }
