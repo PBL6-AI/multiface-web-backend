@@ -1,4 +1,5 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { UploadedFileResponseDto } from '../../files/dtos';
 
 export class UserResponseDto {
   @ApiProperty({
@@ -38,6 +39,21 @@ export class UserResponseDto {
     nullable: true,
   })
   avatarFileId: number | null;
+
+  @ApiPropertyOptional({
+    description: 'Avatar file metadata',
+    type: () => UploadedFileResponseDto,
+    nullable: true,
+  })
+  avatarFile?: UploadedFileResponseDto | null;
+
+  @ApiPropertyOptional({
+    description: 'Computed avatar URL',
+    example:
+      'https://pb5-multiface-assets.s3.ap-southeast-1.amazonaws.com/avatar/2026-04-26/example.jpg',
+    nullable: true,
+  })
+  avatarUrl?: string | null;
 
   @ApiPropertyOptional({
     description: 'Department identifier',

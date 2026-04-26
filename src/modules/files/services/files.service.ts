@@ -28,6 +28,15 @@ type StoreUploadedFileInput = {
 
 @Injectable()
 export class FilesService {
+  private static readonly ALLOWED_AVATAR_MIME_TYPES = new Set([
+    'image/jpeg',
+    'image/jpg',
+    'image/png',
+    'image/webp',
+  ]);
+
+  private static readonly MAX_AVATAR_SIZE_BYTES = 5 * 1024 * 1024;
+
   constructor(
     private readonly configService: ConfigService,
     @Inject(REPOSITORY_TOKENS.FILES)
@@ -84,6 +93,16 @@ export class FilesService {
       size: file.size,
       bucket: this.configService.get<string>('storage.bucket') ?? '',
     };
+  }
+
+  ensureAvatarImageIsValid(file: UploadableFile): void {
+    if (!FilesService.ALLOWED_AVATAR_MIME_TYPES.has(file.mimetype)) {
+      throw new BadRequestException('Avatar must be a JPG, PNG, or WEBP image');
+    }
+
+    if (file.size > FilesService.MAX_AVATAR_SIZE_BYTES) {
+      throw new BadRequestException('Avatar image must not exceed 5MB');
+    }
   }
 
   private normalizeCategory(category?: string): string {

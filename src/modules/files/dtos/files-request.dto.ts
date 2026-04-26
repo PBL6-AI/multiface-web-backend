@@ -23,3 +23,15 @@ export class TestUploadFileDto {
   @MaxLength(255)
   checksum?: string;
 }
+
+export class UploadAvatarFileDto {
+  @ApiPropertyOptional({
+    description: 'Optional checksum for the uploaded avatar image',
+    example: 'sha256:avatar123',
+    maxLength: 255,
+  })
+  @IsOptional()
+  @IsString()
+  @MaxLength(255)
+  checksum?: string;
+}
