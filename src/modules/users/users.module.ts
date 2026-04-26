@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { REPOSITORY_TOKENS } from '../../common/constants';
 import { useUsersRepository } from '../../packages/infrastructure/repositories';
+import { StorageModule } from '../storage';
 import {
   DepartmentEntity,
   FileEntity,
@@ -14,6 +15,7 @@ import { UsersService } from './services';
 
 @Module({
   imports: [
+    StorageModule,
     TypeOrmModule.forFeature([
       UserEntity,
       RoleEntity,

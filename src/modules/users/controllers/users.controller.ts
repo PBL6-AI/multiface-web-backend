@@ -93,7 +93,7 @@ export class UsersController {
     @Body() createUserDto: CreateUserDto,
   ): Promise<ApiSuccessResponse<UserResponseDto>> {
     return this.ok(
-      this.usersService.serializeUser(
+      await this.usersService.serializeUser(
         await this.usersService.createUserByAdmin(createUserDto),
       ),
     );
