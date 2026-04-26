@@ -123,6 +123,7 @@ export class TypeOrmUsersRepository implements UsersRepository {
 
   private readonly userRelations = {
     role: true,
+    avatarFile: true,
     department: true,
     specialization: true,
   } as const;

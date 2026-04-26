@@ -6,6 +6,7 @@ import {
   NotFoundException,
   OnModuleInit,
 } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import type {
   RawRoleEntity,
   RawUserEntity,
@@ -34,6 +35,7 @@ type AcademicAssignment = {
 @Injectable()
 export class UsersService implements OnModuleInit {
   constructor(
+    private readonly configService: ConfigService,
     @Inject(REPOSITORY_TOKENS.USERS)
     private readonly usersRepository: UsersRepository,
   ) {}
@@ -139,6 +141,20 @@ export class UsersService implements OnModuleInit {
       email: user.email,
       phone: user.phone,
       avatarFileId: user.avatarFileId,
+      avatarFile: user.avatarFile
+        ? {
+            id: user.avatarFile.id,
+            fileKey: user.avatarFile.fileKey,
+            filename: user.avatarFile.filename,
+            category: user.avatarFile.category,
+            storageProvider: user.avatarFile.storageProvider,
+            size: user.avatarFile.size,
+            bucket: this.configService.get<string>('storage.bucket') ?? '',
+          }
+        : null,
+      avatarUrl: user.avatarFile
+        ? this.buildStoredObjectUrl(user.avatarFile.fileKey)
+        : null,
       departmentId: user.departmentId,
       departmentName: user.department?.name ?? null,
       specializationId: user.specializationId,
@@ -148,6 +164,26 @@ export class UsersService implements OnModuleInit {
       createdAt: user.createdAt,
       updatedAt: user.updatedAt,
     };
+  }
+
+  private buildStoredObjectUrl(fileKey: string): string {
+    const bucket = this.configService.get<string>('storage.bucket') ?? '';
+    const region = this.configService.get<string>('storage.region') ?? '';
+
+    if (!bucket || !fileKey) {
+      return '';
+    }
+
+    const normalizedKey = fileKey
+      .split('/')
+      .map((segment) => encodeURIComponent(segment))
+      .join('/');
+
+    if (region) {
+      return `https://${bucket}.s3.${region}.amazonaws.com/${normalizedKey}`;
+    }
+
+    return `https://${bucket}.s3.amazonaws.com/${normalizedKey}`;
   }
 
   private async createUser(input: {
