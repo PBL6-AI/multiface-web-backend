@@ -95,6 +95,13 @@ export class FilesService {
     };
   }
 
+  async serializeUploadedFileWithSignedUrl(file: RawFileEntity) {
+    return {
+      ...this.serializeUploadedFile(file),
+      url: await this.buildSignedFileUrl(file.fileKey),
+    };
+  }
+
   ensureAvatarImageIsValid(file: UploadableFile): void {
     if (!FilesService.ALLOWED_AVATAR_MIME_TYPES.has(file.mimetype)) {
       throw new BadRequestException('Avatar must be a JPG, PNG, or WEBP image');
@@ -138,5 +145,28 @@ export class FilesService {
       .replace(/^-|-$/g, '');
 
     return `${sanitizedBaseName || 'uploaded-file'}${extension}`;
+  }
+
+  private async buildSignedFileUrl(fileKey: string): Promise<string> {
+    if (!fileKey) {
+      return '';
+    }
+
+    return this.cloudStorageService.getSignedObjectUrl(
+      fileKey,
+      this.getSignedUrlTtlSeconds(),
+    );
+  }
+
+  private getSignedUrlTtlSeconds(): number {
+    const ttlFromConfig =
+      this.configService.get<number>('storage.signedUrlExpiresInSeconds') ??
+      900;
+
+    if (!Number.isFinite(ttlFromConfig) || ttlFromConfig <= 0) {
+      return 900;
+    }
+
+    return Math.floor(ttlFromConfig);
   }
 }

@@ -18,6 +18,7 @@ import type { FaceAiProvider } from '../../ai-integration';
 import type { AuthenticatedUser } from '../../auth/interfaces';
 import { FilesService } from '../../files/services';
 import {
+  FaceRegistrationRequestResponseDto,
   ListFaceRegistrationRequestsQueryDto,
   ReviewFaceRegistrationRequestDto,
   UploadFaceRegistrationImageDto,
@@ -43,7 +44,7 @@ export class FacesService {
 
   async createRequest(
     currentUser: AuthenticatedUser,
-  ): Promise<ReturnType<FacesService['serializeRequest']>> {
+  ): Promise<FaceRegistrationRequestResponseDto> {
     const existingPendingRequest =
       await this.facesRepository.findPendingRequestByStudentId(currentUser.id);
 
@@ -57,12 +58,12 @@ export class FacesService {
       studentId: currentUser.id,
     });
 
-    return this.serializeRequest(request);
+    return await this.serializeRequest(request);
   }
 
   async getLatestRequestForStudent(
     currentUser: AuthenticatedUser,
-  ): Promise<ReturnType<FacesService['serializeRequest']>> {
+  ): Promise<FaceRegistrationRequestResponseDto> {
     const request = await this.facesRepository.findLatestRequestByStudentId(
       currentUser.id,
     );
@@ -71,13 +72,13 @@ export class FacesService {
       throw new NotFoundException('No face registration request found');
     }
 
-    return this.serializeRequest(request);
+    return await this.serializeRequest(request);
   }
 
   async getRequestByIdForUser(
     requestId: number,
     currentUser: AuthenticatedUser,
-  ): Promise<ReturnType<FacesService['serializeRequest']>> {
+  ): Promise<FaceRegistrationRequestResponseDto> {
     const request = await this.findRequestOrThrow(requestId);
 
     if (currentUser.role !== 'admin' && request.studentId !== currentUser.id) {
@@ -86,17 +87,19 @@ export class FacesService {
       );
     }
 
-    return this.serializeRequest(request);
+    return await this.serializeRequest(request);
   }
 
   async listRequests(
     query: ListFaceRegistrationRequestsQueryDto,
-  ): Promise<ReturnType<FacesService['serializeRequest']>[]> {
+  ): Promise<FaceRegistrationRequestResponseDto[]> {
     const requests = await this.facesRepository.listRequests({
       status: query.status,
     });
 
-    return requests.map((request) => this.serializeRequest(request));
+    return Promise.all(
+      requests.map((request) => this.serializeRequest(request)),
+    );
   }
 
   async uploadRequestImage(
@@ -104,7 +107,7 @@ export class FacesService {
     currentUser: AuthenticatedUser,
     file: UploadableFile,
     uploadFaceRegistrationImageDto: UploadFaceRegistrationImageDto,
-  ): Promise<ReturnType<FacesService['serializeRequest']>> {
+  ): Promise<FaceRegistrationRequestResponseDto> {
     if (!file.buffer.length) {
       throw new BadRequestException('Uploaded image cannot be empty');
     }
@@ -173,14 +176,14 @@ export class FacesService {
 
     const updatedRequest = await this.findRequestOrThrow(requestId);
 
-    return this.serializeRequest(updatedRequest);
+    return await this.serializeRequest(updatedRequest);
   }
 
   async reviewRequest(
     requestId: number,
     reviewer: AuthenticatedUser,
     reviewFaceRegistrationRequestDto: ReviewFaceRegistrationRequestDto,
-  ): Promise<ReturnType<FacesService['serializeRequest']>> {
+  ): Promise<FaceRegistrationRequestResponseDto> {
     const request = await this.findRequestOrThrow(requestId);
 
     if (request.status !== ApprovalStatus.PENDING) {
@@ -248,10 +251,12 @@ export class FacesService {
 
     const updatedRequest = await this.findRequestOrThrow(requestId);
 
-    return this.serializeRequest(updatedRequest);
+    return await this.serializeRequest(updatedRequest);
   }
 
-  serializeRequest(request: RawFaceRegistrationRequestEntity) {
+  async serializeRequest(
+    request: RawFaceRegistrationRequestEntity,
+  ): Promise<FaceRegistrationRequestResponseDto> {
     const sortedImages = [...request.faceImages].sort((left, right) => {
       const poseOrderDifference =
         this.poseOrder(left.pose) - this.poseOrder(right.pose);
@@ -292,11 +297,13 @@ export class FacesService {
       ),
       completedPoses,
       missingPoses,
-      images: sortedImages.map((image) => this.serializeImage(image)),
+      images: await Promise.all(
+        sortedImages.map((image) => this.serializeImage(image)),
+      ),
     };
   }
 
-  private serializeImage(image: RawFaceImageEntity) {
+  private async serializeImage(image: RawFaceImageEntity) {
     return {
       id: image.id,
       pose: image.pose,
@@ -306,7 +313,9 @@ export class FacesService {
       qualityScore: image.qualityScore,
       createdAt: image.createdAt,
       embeddingStatus: this.resolveImageEmbeddingStatus(image),
-      file: this.filesService.serializeUploadedFile(image.file),
+      file: await this.filesService.serializeUploadedFileWithSignedUrl(
+        image.file,
+      ),
     };
   }
 

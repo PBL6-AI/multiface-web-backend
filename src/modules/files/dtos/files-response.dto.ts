@@ -43,4 +43,13 @@ export class UploadedFileResponseDto {
     example: 248321,
   })
   size: number;
+
+  @ApiProperty({
+    description:
+      'Temporary signed URL for reading the file from object storage',
+    example:
+      'https://pb5-multiface-assets.s3.ap-southeast-1.amazonaws.com/face_registration_raw/example.jpg?X-Amz-Signature=...',
+    required: false,
+  })
+  url?: string;
 }
