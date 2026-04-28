@@ -2,9 +2,11 @@ import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import {
   DeleteObjectCommand,
+  GetObjectCommand,
   PutObjectCommand,
   S3Client,
 } from '@aws-sdk/client-s3';
+import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import type { CloudStorageService, UploadBufferInput } from '../interfaces';
 import type { StoredObjectResult } from '../types';
 
@@ -55,5 +57,19 @@ export class S3StorageService implements CloudStorageService {
         Key: key,
       }),
     );
+  }
+
+  async getSignedObjectUrl(
+    key: string,
+    expiresInSeconds: number,
+  ): Promise<string> {
+    const command = new GetObjectCommand({
+      Bucket: this.bucket,
+      Key: key,
+    });
+
+    return getSignedUrl(this.client, command, {
+      expiresIn: expiresInSeconds,
+    });
   }
 }

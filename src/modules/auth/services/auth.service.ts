@@ -54,7 +54,7 @@ export class AuthService {
     }
 
     const user = await this.usersService.createSelfRegisteredUser(registerDto);
-    return this.usersService.serializeUser(user);
+    return await this.usersService.serializeUser(user);
   }
 
   async login(loginDto: LoginDto): Promise<LoginResponseDto> {
@@ -192,7 +192,7 @@ export class AuthService {
     return {
       accessToken,
       refreshToken,
-      user: this.usersService.serializeUser(user),
+      user: await this.usersService.serializeUser(user),
     };
   }
 

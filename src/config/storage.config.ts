@@ -6,6 +6,7 @@ export interface StorageConfig {
   bucket: string;
   accessKeyId: string;
   secretAccessKey: string;
+  signedUrlExpiresInSeconds: number;
 }
 
 export default registerAs(
@@ -16,5 +17,9 @@ export default registerAs(
     bucket: process.env.AWS_S3_BUCKET ?? '',
     accessKeyId: process.env.AWS_ACCESS_KEY_ID ?? '',
     secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY ?? '',
+    signedUrlExpiresInSeconds: Number.parseInt(
+      process.env.AWS_SIGNED_URL_EXPIRES_IN_SECONDS ?? '900',
+      10,
+    ),
   }),
 );

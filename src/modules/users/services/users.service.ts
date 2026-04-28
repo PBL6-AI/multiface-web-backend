@@ -14,6 +14,8 @@ import type {
 } from '../../../packages/domain';
 import { REPOSITORY_TOKENS } from '../../../common/constants';
 import { hashSecret } from '../../../common/utils';
+import { STORAGE_TOKENS } from '../../storage/constants';
+import type { CloudStorageService } from '../../storage/interfaces';
 import {
   DEFAULT_STUDENT_ROLE,
   SYSTEM_ROLES,
@@ -38,6 +40,8 @@ export class UsersService implements OnModuleInit {
     private readonly configService: ConfigService,
     @Inject(REPOSITORY_TOKENS.USERS)
     private readonly usersRepository: UsersRepository,
+    @Inject(STORAGE_TOKENS.CLOUD_STORAGE)
+    private readonly cloudStorageService: CloudStorageService,
   ) {}
 
   async onModuleInit() {
@@ -70,12 +74,12 @@ export class UsersService implements OnModuleInit {
       query.role?.toLowerCase(),
     );
 
-    return users.map((user) => this.serializeUser(user));
+    return Promise.all(users.map((user) => this.serializeUser(user)));
   }
 
   async getProfile(userId: number) {
     const user = await this.findByIdOrThrow(userId);
-    return this.serializeUser(user);
+    return await this.serializeUser(user);
   }
 
   async getUserById(userId: number) {
@@ -86,7 +90,7 @@ export class UsersService implements OnModuleInit {
     const user = await this.findByIdOrThrow(userId);
     const updatedUser = await this.applyUserUpdates(user, updateProfileDto);
 
-    return this.serializeUser(updatedUser);
+    return await this.serializeUser(updatedUser);
   }
 
   async updateUser(userId: number, updateUserDto: UpdateUserDto) {
@@ -100,7 +104,7 @@ export class UsersService implements OnModuleInit {
     }
 
     const savedUser = await this.usersRepository.save(updatedUser);
-    return this.serializeUser(savedUser);
+    return await this.serializeUser(savedUser);
   }
 
   async findForAuthentication(userCode: string): Promise<RawUserEntity | null> {
@@ -133,7 +137,7 @@ export class UsersService implements OnModuleInit {
     return this.usersRepository.save(user);
   }
 
-  serializeUser(user: RawUserEntity) {
+  async serializeUser(user: RawUserEntity) {
     return {
       id: user.id,
       fullName: user.fullName,
@@ -153,7 +157,7 @@ export class UsersService implements OnModuleInit {
           }
         : null,
       avatarUrl: user.avatarFile
-        ? this.buildStoredObjectUrl(user.avatarFile.fileKey)
+        ? await this.buildSignedAvatarUrl(user.avatarFile.fileKey)
         : null,
       departmentId: user.departmentId,
       departmentName: user.department?.name ?? null,
@@ -166,24 +170,28 @@ export class UsersService implements OnModuleInit {
     };
   }
 
-  private buildStoredObjectUrl(fileKey: string): string {
-    const bucket = this.configService.get<string>('storage.bucket') ?? '';
-    const region = this.configService.get<string>('storage.region') ?? '';
-
-    if (!bucket || !fileKey) {
+  private async buildSignedAvatarUrl(fileKey: string): Promise<string> {
+    if (!fileKey) {
       return '';
     }
 
-    const normalizedKey = fileKey
-      .split('/')
-      .map((segment) => encodeURIComponent(segment))
-      .join('/');
+    const expiresInSeconds = this.getSignedUrlTtlSeconds();
+    return this.cloudStorageService.getSignedObjectUrl(
+      fileKey,
+      expiresInSeconds,
+    );
+  }
 
-    if (region) {
-      return `https://${bucket}.s3.${region}.amazonaws.com/${normalizedKey}`;
+  private getSignedUrlTtlSeconds(): number {
+    const ttlFromConfig =
+      this.configService.get<number>('storage.signedUrlExpiresInSeconds') ??
+      900;
+
+    if (!Number.isFinite(ttlFromConfig) || ttlFromConfig <= 0) {
+      return 900;
     }
 
-    return `https://${bucket}.s3.amazonaws.com/${normalizedKey}`;
+    return Math.floor(ttlFromConfig);
   }
 
   private async createUser(input: {

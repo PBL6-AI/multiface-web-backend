@@ -10,4 +10,5 @@ export type UploadBufferInput = {
 export interface CloudStorageService {
   uploadBuffer(input: UploadBufferInput): Promise<StoredObjectResult>;
   deleteObject(key: string): Promise<void>;
+  getSignedObjectUrl(key: string, expiresInSeconds: number): Promise<string>;
 }
