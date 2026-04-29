@@ -1,4 +1,4 @@
-﻿import { registerAs } from '@nestjs/config';
+import { registerAs } from '@nestjs/config';
 
 export interface DatabaseConfig {
   host: string;
@@ -7,6 +7,7 @@ export interface DatabaseConfig {
   password: string;
   database: string;
   synchronize: boolean;
+  ssl: boolean;
 }
 
 export default registerAs(
@@ -18,5 +19,6 @@ export default registerAs(
     password: process.env.DB_PASSWORD ?? 'postgres',
     database: process.env.DB_NAME ?? 'multiface',
     synchronize: (process.env.DB_SYNCHRONIZE ?? 'false') === 'true',
+    ssl: (process.env.DB_SSL ?? 'false') === 'true',
   }),
 );

@@ -16,6 +16,7 @@ export const typeOrmConfig: TypeOrmModuleAsyncOptions = {
       username: databaseConfig.username,
       password: databaseConfig.password,
       database: databaseConfig.database,
+      ssl: databaseConfig.ssl ? { rejectUnauthorized: false } : false,
       entities: [
         join(
           __dirname,
