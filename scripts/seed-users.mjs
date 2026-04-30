@@ -19,6 +19,11 @@ const dbConfig = {
   database: process.env.DB_NAME ?? env.DB_NAME ?? 'multiface',
 };
 
+const useSsl = (process.env.DB_SSL ?? env.DB_SSL) === 'true';
+if (useSsl) {
+  dbConfig.ssl = { rejectUnauthorized: false };
+}
+
 const seedPassword = process.env.SEED_USER_PASSWORD ?? 'Test@123456';
 
 const seedUsers = [

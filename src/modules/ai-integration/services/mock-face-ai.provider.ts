@@ -64,6 +64,21 @@ export class MockFaceAiProvider implements FaceAiProvider {
     };
   }
 
+  async startAttendanceSession(sessionId: number): Promise<void> {
+    console.log(`[MockAI] Starting attendance session: ${sessionId}`);
+  }
+
+  async stopAttendanceSession(sessionId: number): Promise<void> {
+    console.log(`[MockAI] Stopping attendance session: ${sessionId}`);
+  }
+
+  async getAttendanceStatus(): Promise<{
+    is_running: boolean;
+    source: string | null;
+  }> {
+    return { is_running: true, source: 'mock-source' };
+  }
+
   private buildDeterministicEmbedding(seed: string): number[] {
     let state = 0;
 

@@ -10,13 +10,17 @@ import {
 import { useAttendanceRepository } from '../../packages/infrastructure/repositories';
 import { AuthModule } from '../auth';
 import { AttendanceController } from './controllers';
-import { AttendanceService } from './services';
+import { AttendanceService, AttendanceMonitorService } from './services';
 import { UsersModule } from '../users';
+import { FacesModule } from '../faces';
+import { AiIntegrationModule } from '../ai-integration';
 
 @Module({
   imports: [
     UsersModule,
     AuthModule,
+    FacesModule,
+    AiIntegrationModule,
     TypeOrmModule.forFeature([
       AttendanceSessionEntity,
       AttendanceRecordEntity,
@@ -25,7 +29,11 @@ import { UsersModule } from '../users';
     ]),
   ],
   controllers: [AttendanceController],
-  providers: [AttendanceService, useAttendanceRepository()],
+  providers: [
+    AttendanceService,
+    AttendanceMonitorService,
+    useAttendanceRepository(),
+  ],
   exports: [AttendanceService, REPOSITORY_TOKENS.ATTENDANCE],
 })
 export class AttendanceModule {}

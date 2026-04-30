@@ -14,6 +14,7 @@ import {
 } from '../../../common/domain/enums';
 import type {
   AttendanceRepository,
+  FacesRepository,
   RawAttendanceSessionEntity,
 } from '../../../packages/domain';
 import {
@@ -21,14 +22,22 @@ import {
   CreateAttendanceSessionDto,
   IngestRecognitionEventDto,
   MockAttendanceSessionFeedDto,
+  VerifyAttendanceRequestDto,
+  VerifyAttendanceResponseDto,
 } from '../dtos';
 import type { AuthenticatedUser } from '../../auth/interfaces';
+import { AI_PROVIDER_TOKEN } from '../../ai-integration/ai.constants';
+import type { FaceAiProvider } from '../../ai-integration/interfaces/face-ai-provider.interface';
 
 @Injectable()
 export class AttendanceService {
   constructor(
     @Inject(REPOSITORY_TOKENS.ATTENDANCE)
     private readonly attendanceRepository: AttendanceRepository,
+    @Inject(REPOSITORY_TOKENS.FACES)
+    private readonly facesRepository: FacesRepository,
+    @Inject(AI_PROVIDER_TOKEN)
+    private readonly faceAiProvider: FaceAiProvider,
   ) {}
 
   async createSession(
@@ -62,6 +71,15 @@ export class AttendanceService {
         createAttendanceSessionDto.confidenceThreshold ?? null,
       status: AttendanceSessionStatus.ACTIVE,
     });
+
+    // Notify AI service to start the video pipeline
+    try {
+      await this.faceAiProvider.startAttendanceSession(session.id);
+    } catch (error) {
+      // We don't throw here to avoid failing session creation if AI service is down
+      // But we should probably log it
+      console.error('Failed to start AI pipeline:', error);
+    }
 
     return this.serializeSession(session);
   }
@@ -231,6 +249,13 @@ export class AttendanceService {
     session.endTime = new Date();
     await this.attendanceRepository.saveSession(session);
 
+    // Notify AI service to stop the video pipeline
+    try {
+      await this.faceAiProvider.stopAttendanceSession(sessionId);
+    } catch (error) {
+      console.error('Failed to stop AI pipeline:', error);
+    }
+
     return {
       message: 'Attendance session closed successfully',
     };
@@ -343,6 +368,104 @@ export class AttendanceService {
     return {
       message: 'Mock attendance feed generated successfully',
     };
+  }
+
+  async verifyAttendance(
+    request: VerifyAttendanceRequestDto,
+  ): Promise<VerifyAttendanceResponseDto> {
+    const activeSessions = (
+      await this.attendanceRepository.listSessions()
+    ).filter((s) => s.status === AttendanceSessionStatus.ACTIVE);
+
+    if (activeSessions.length === 0) {
+      return {
+        status: 'NO_MATCH',
+        message: 'No active attendance sessions found',
+      };
+    }
+
+    // Collect all student IDs from active sessions
+    const studentToSessionMap = new Map<number, RawAttendanceSessionEntity>();
+    for (const session of activeSessions) {
+      for (const member of session.classEntity.classMembers) {
+        studentToSessionMap.set(member.studentId, session);
+      }
+    }
+
+    const studentIds = Array.from(studentToSessionMap.keys());
+    if (studentIds.length === 0) {
+      return {
+        status: 'NO_MATCH',
+        message: 'No students found in active sessions',
+      };
+    }
+
+    const closestMatches = await this.facesRepository.findClosestEmbedding(
+      request.embedding,
+      studentIds,
+      1,
+    );
+
+    if (!closestMatches.length) {
+      return {
+        status: 'NO_MATCH',
+        message: 'No matching face embedding found',
+      };
+    }
+
+    const match = closestMatches[0];
+    const session = studentToSessionMap.get(match.studentId);
+
+    if (!session) {
+      return {
+        status: 'NO_MATCH',
+        message: 'Internal error: mapped session not found',
+      };
+    }
+
+    const threshold = session.confidenceThreshold ?? 0.8;
+    if (match.similarity < threshold) {
+      return {
+        status: 'NO_MATCH',
+        similarity: match.similarity,
+        message: `Similarity ${match.similarity.toFixed(4)} is below threshold ${threshold}`,
+      };
+    }
+
+    // Attempt to register the attendance using the ingest event logic
+    try {
+      const ingestDto: IngestRecognitionEventDto = {
+        sourceDeviceId: request.cameraId,
+        frameId: `track-${request.trackId}-${Date.now()}`,
+        candidateUserId: match.studentId,
+        matchedEmbeddingId: match.embeddingId,
+        confidenceScore: request.detectionScore,
+        similarityScore: match.similarity,
+        isRealFace: true,
+      };
+
+      const result = await this.ingestRecognitionEvent(session.id, ingestDto);
+
+      // Find the user name to return
+      const member = session.classEntity.classMembers.find(
+        (m) => m.studentId === match.studentId,
+      );
+
+      return {
+        status: 'MATCH',
+        userId: match.studentId,
+        userName: member?.student?.fullName ?? 'Unknown',
+        similarity: match.similarity,
+        message: result.reason,
+      };
+    } catch (error: unknown) {
+      const errorMessage =
+        error instanceof Error ? error.message : 'Failed to record attendance';
+      return {
+        status: 'NO_MATCH',
+        message: errorMessage,
+      };
+    }
   }
 
   private async applyRecognitionDecision(

@@ -38,6 +38,8 @@ import {
   MockAttendanceSessionFeedDto,
   RecognitionEventIngestionResponseDto,
   StudentAttendanceHistoryResponseDto,
+  VerifyAttendanceRequestDto,
+  VerifyAttendanceResponseDto,
 } from '../dtos';
 import { AttendanceService } from '../services';
 
@@ -277,6 +279,34 @@ export class AttendanceController {
         ingestRecognitionEventDto,
       ),
     );
+  }
+
+  @Post('verify')
+  @ApiHeader({
+    name: 'x-edge-token',
+    required: false,
+    description: 'Shared token used by the AI service to verify attendance',
+  })
+  @ApiOperation({
+    summary: 'Verify face embedding against active sessions',
+  })
+  @ApiSuccessResponseDoc({
+    status: HttpStatus.OK,
+    description: 'Verification result returned',
+    model: VerifyAttendanceResponseDto,
+  })
+  async verifyAttendance(
+    @Headers('x-edge-token') edgeToken: string | undefined,
+    @Body() verifyAttendanceRequestDto: VerifyAttendanceRequestDto,
+  ): Promise<VerifyAttendanceResponseDto> {
+    const expectedToken =
+      this.configService.get<string>('edge.ingestToken') ?? '';
+
+    if (expectedToken && edgeToken !== expectedToken) {
+      throw new UnauthorizedException('Invalid edge token');
+    }
+
+    return this.attendanceService.verifyAttendance(verifyAttendanceRequestDto);
   }
 
   private ok<TData>(data: TData): ApiSuccessResponse<TData> {
