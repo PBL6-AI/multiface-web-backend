@@ -6,7 +6,7 @@ export type GenerateFaceEmbeddingsInput = {
   studentId: number;
   images: Array<{
     faceImageId: number;
-    fileKey: string;
+    url: string;
     pose: FaceImagePose;
   }>;
 };
@@ -61,4 +61,10 @@ export interface FaceAiProvider {
     input: GenerateFaceEmbeddingsInput,
   ): Promise<GenerateFaceEmbeddingsResult>;
   recognizeFace(input: RecognizeFaceInput): Promise<RecognizeFaceResult>;
+  startAttendanceSession(sessionId: number): Promise<void>;
+  stopAttendanceSession(sessionId: number): Promise<void>;
+  getAttendanceStatus(): Promise<{
+    is_running: boolean;
+    source: string | null;
+  }>;
 }

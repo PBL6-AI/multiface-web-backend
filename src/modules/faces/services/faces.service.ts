@@ -223,25 +223,24 @@ export class FacesService {
         ? rejectionReason
         : null;
 
-    const reviewedImages = request.faceImages.map((image) => ({
-      ...image,
-      status: reviewFaceRegistrationRequestDto.status,
-      reviewedById: reviewer.id,
-      reviewedAt,
-      rejectionReason:
+    for (const image of request.faceImages) {
+      image.status = reviewFaceRegistrationRequestDto.status;
+      image.reviewedById = reviewer.id;
+      image.reviewedAt = reviewedAt;
+      image.rejectionReason =
         reviewFaceRegistrationRequestDto.status === ApprovalStatus.REJECTED
           ? rejectionReason
-          : null,
-      metadata:
-        reviewFaceRegistrationRequestDto.status === ApprovalStatus.APPROVED
-          ? this.withEmbeddingMetadata(image, {
-              status: 'queued',
-              updatedAt: reviewedAt.toISOString(),
-            })
-          : image.metadata,
-    }));
+          : null;
 
-    await this.facesRepository.saveImages(reviewedImages);
+      if (reviewFaceRegistrationRequestDto.status === ApprovalStatus.APPROVED) {
+        image.metadata = this.withEmbeddingMetadata(image, {
+          status: 'queued',
+          updatedAt: reviewedAt.toISOString(),
+        });
+      }
+    }
+
+    await this.facesRepository.saveImages(request.faceImages);
 
     await this.facesRepository.saveRequest(request);
 
@@ -276,7 +275,7 @@ export class FacesService {
       (image) => image.status === ApprovalStatus.APPROVED,
     );
     const embeddedImages = approvedImages.filter(
-      (image) => image.embeddings.length > 0,
+      (image) => (image.embeddings?.length ?? 0) > 0,
     );
 
     return {
@@ -351,11 +350,19 @@ export class FacesService {
       const result = await this.aiProvider.generateFaceEmbeddings({
         requestId: request.id,
         studentId: request.studentId,
-        images: approvedImages.map((image) => ({
-          faceImageId: image.id,
-          fileKey: image.file.fileKey,
-          pose: image.pose,
-        })),
+        images: await Promise.all(
+          approvedImages.map(async (image) => {
+            const serialized =
+              await this.filesService.serializeUploadedFileWithSignedUrl(
+                image.file,
+              );
+            return {
+              faceImageId: image.id,
+              url: serialized.url,
+              pose: image.pose,
+            };
+          }),
+        ),
       });
 
       await this.facesRepository.deleteEmbeddingsByFaceImageIds(
@@ -377,37 +384,38 @@ export class FacesService {
         })),
       );
 
-      const processedImages = approvedImages.map((image) => {
+      for (const image of approvedImages) {
+        // Clear stale embeddings relation in memory to prevent TypeORM from
+        // trying to update/nullify them after they were deleted from DB.
+        image.embeddings = [];
+
         const embedding = result.embeddings.find(
           (item) => item.faceImageId === image.id,
         );
 
-        return {
-          ...image,
-          metadata: this.withEmbeddingMetadata(image, {
-            status: embedding ? 'completed' : 'failed',
-            updatedAt: new Date().toISOString(),
-            modelName: embedding?.modelName ?? null,
-            modelVersion: embedding?.modelVersion ?? null,
-          }),
-        };
-      });
+        image.metadata = this.withEmbeddingMetadata(image, {
+          status: embedding ? 'completed' : 'failed',
+          updatedAt: new Date().toISOString(),
+          modelName: embedding?.modelName ?? null,
+          modelVersion: embedding?.modelVersion ?? null,
+        });
+      }
 
-      await this.facesRepository.saveImages(processedImages);
+      await this.facesRepository.saveImages(approvedImages);
     } catch (error) {
-      const failedImages = approvedImages.map((image) => ({
-        ...image,
-        metadata: this.withEmbeddingMetadata(image, {
+      for (const image of approvedImages) {
+        image.embeddings = []; // Safety clear here too
+        image.metadata = this.withEmbeddingMetadata(image, {
           status: 'failed',
           updatedAt: new Date().toISOString(),
           reason:
             error instanceof Error
               ? error.message
               : 'Unknown embedding generation error',
-        }),
-      }));
+        });
+      }
 
-      await this.facesRepository.saveImages(failedImages);
+      await this.facesRepository.saveImages(approvedImages);
     }
   }
 
@@ -447,7 +455,7 @@ export class FacesService {
   }
 
   private resolveImageEmbeddingStatus(image: RawFaceImageEntity): string {
-    if (image.embeddings.length > 0) {
+    if ((image.embeddings?.length ?? 0) > 0) {
       return 'completed';
     }
 

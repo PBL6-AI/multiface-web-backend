@@ -45,6 +45,12 @@ export type CreateFaceEmbeddingRecordInput = {
   metadata?: Record<string, unknown> | null;
 };
 
+export type ClosestEmbeddingResult = {
+  studentId: number;
+  embeddingId: number;
+  similarity: number;
+};
+
 export interface FacesRepository {
   findRequestById(
     requestId: number,
@@ -77,4 +83,9 @@ export interface FacesRepository {
     inputs: CreateFaceEmbeddingRecordInput[],
   ): Promise<RawFaceEmbeddingEntity[]>;
   deleteEmbeddingsByFaceImageIds(faceImageIds: number[]): Promise<void>;
+  findClosestEmbedding(
+    embedding: number[],
+    studentIds: number[],
+    limit?: number,
+  ): Promise<ClosestEmbeddingResult[]>;
 }

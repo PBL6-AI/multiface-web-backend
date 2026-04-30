@@ -11,6 +11,7 @@ import type {
   RawFaceEmbeddingEntity,
   RawFaceImageEntity,
   RawFaceRegistrationRequestEntity,
+  ClosestEmbeddingResult,
 } from '../../domain';
 import {
   FaceEmbeddingEntity,
@@ -179,6 +180,40 @@ export class TypeOrmFacesRepository implements FacesRepository {
     await this.faceEmbeddingsRepository.delete({
       faceImageId: In(faceImageIds),
     });
+  }
+
+  async findClosestEmbedding(
+    embedding: number[],
+    studentIds: number[],
+    limit: number = 1,
+  ): Promise<ClosestEmbeddingResult[]> {
+    if (!studentIds.length) {
+      return [];
+    }
+
+    const pgVectorArray = `[${embedding.join(',')}]`;
+
+    const results = await this.faceEmbeddingsRepository
+      .createQueryBuilder('embedding')
+      .select([
+        'embedding.studentId AS "studentId"',
+        'embedding.id AS "embeddingId"',
+      ])
+      .addSelect(
+        `1 - (embedding.embedding <=> '${pgVectorArray}')`,
+        'similarity',
+      )
+      .where('embedding.studentId IN (:...studentIds)', { studentIds })
+      .andWhere('embedding.isActive = :isActive', { isActive: true })
+      .orderBy(`embedding.embedding <=> '${pgVectorArray}'`, 'ASC')
+      .limit(limit)
+      .getRawMany();
+
+    return results.map((row) => ({
+      studentId: Number(row.studentId),
+      embeddingId: Number(row.embeddingId),
+      similarity: Number(row.similarity),
+    }));
   }
 
   private readonly requestRelations = {

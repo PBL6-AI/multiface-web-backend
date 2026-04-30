@@ -33,6 +33,51 @@ export class HttpFaceAiProvider implements FaceAiProvider {
     return this.post<RecognizeFaceResult>('/recognition/infer', input);
   }
 
+  async startAttendanceSession(sessionId: number): Promise<void> {
+    await this.post('/attendance/start', { sessionId });
+  }
+
+  async stopAttendanceSession(sessionId: number): Promise<void> {
+    await this.post('/attendance/stop', { sessionId });
+  }
+
+  async getAttendanceStatus(): Promise<{
+    is_running: boolean;
+    source: string | null;
+  }> {
+    const abortController = new AbortController();
+    const timeoutHandle = setTimeout(
+      () => abortController.abort(),
+      this.config.timeoutMs,
+    );
+
+    try {
+      const response = await fetch(`${this.config.baseUrl}/attendance/status`, {
+        method: 'GET',
+        headers: {
+          'content-type': 'application/json',
+          ...(this.config.authToken
+            ? { authorization: `Bearer ${this.config.authToken}` }
+            : {}),
+        },
+        signal: abortController.signal,
+      });
+
+      if (!response.ok) {
+        return { is_running: false, source: null };
+      }
+
+      return (await response.json()) as {
+        is_running: boolean;
+        source: string | null;
+      };
+    } catch (_error) {
+      return { is_running: false, source: null };
+    } finally {
+      clearTimeout(timeoutHandle);
+    }
+  }
+
   private async post<TResponse>(
     path: string,
     payload: unknown,
@@ -63,9 +108,9 @@ export class HttpFaceAiProvider implements FaceAiProvider {
       }
 
       return (await response.json()) as TResponse;
-    } catch (error) {
-      if (error instanceof InternalServerErrorException) {
-        throw error;
+    } catch (_error) {
+      if (_error instanceof InternalServerErrorException) {
+        throw _error;
       }
 
       throw new InternalServerErrorException('Unable to reach the AI service');
