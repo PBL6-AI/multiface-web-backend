@@ -1,4 +1,9 @@
-import { ApprovalStatus, FaceImagePose } from '../../../common/domain/enums';
+import {
+  ApprovalStatus,
+  FaceImagePose,
+  FaceRegistrationEmbeddingStatus,
+  FaceRegistrationSessionStatus,
+} from '../../../common/domain/enums';
 import type {
   RawFaceEmbeddingEntity,
   RawFaceImageEntity,
@@ -8,6 +13,11 @@ import type {
 export type CreateFaceRegistrationRequestRecordInput = {
   studentId: number;
   status?: ApprovalStatus;
+  sessionStatus?: FaceRegistrationSessionStatus;
+  embeddingStatus?: FaceRegistrationEmbeddingStatus;
+  targetCountPerPose?: number;
+  completedAt?: Date | null;
+  metadata?: Record<string, unknown> | null;
 };
 
 export type CreateFaceImageRecordInput = {
@@ -27,8 +37,8 @@ export type CreateFaceImageRecordInput = {
 };
 
 export type ListFaceRegistrationRequestsOptions = {
-  status?: ApprovalStatus;
   studentId?: number;
+  sessionStatus?: FaceRegistrationSessionStatus;
 };
 
 export type CreateFaceEmbeddingRecordInput = {
@@ -52,33 +62,31 @@ export type ClosestEmbeddingResult = {
 };
 
 export interface FacesRepository {
-  findRequestById(
-    requestId: number,
+  findSessionById(
+    sessionId: number,
   ): Promise<RawFaceRegistrationRequestEntity | null>;
-  findLatestRequestByStudentId(
+  findLatestSessionByStudentId(
     studentId: number,
   ): Promise<RawFaceRegistrationRequestEntity | null>;
-  findPendingRequestByStudentId(
+  findActiveSessionByStudentId(
     studentId: number,
   ): Promise<RawFaceRegistrationRequestEntity | null>;
-  createRequest(
+  createSession(
     input: CreateFaceRegistrationRequestRecordInput,
   ): Promise<RawFaceRegistrationRequestEntity>;
-  createFaceImage(
-    input: CreateFaceImageRecordInput,
-  ): Promise<RawFaceImageEntity>;
-  findRequestImageByPose(
-    requestId: number,
+  createSample(input: CreateFaceImageRecordInput): Promise<RawFaceImageEntity>;
+  countSessionSamples(sessionId: number): Promise<number>;
+  countSessionSamplesByPose(
+    sessionId: number,
     pose: FaceImagePose,
-  ): Promise<RawFaceImageEntity | null>;
-  countRequestImages(requestId: number): Promise<number>;
-  listRequests(
+  ): Promise<number>;
+  listSessions(
     options?: ListFaceRegistrationRequestsOptions,
   ): Promise<RawFaceRegistrationRequestEntity[]>;
-  saveRequest(
-    request: RawFaceRegistrationRequestEntity,
+  saveSession(
+    session: RawFaceRegistrationRequestEntity,
   ): Promise<RawFaceRegistrationRequestEntity>;
-  saveImages(images: RawFaceImageEntity[]): Promise<RawFaceImageEntity[]>;
+  saveSamples(images: RawFaceImageEntity[]): Promise<RawFaceImageEntity[]>;
   createEmbeddings(
     inputs: CreateFaceEmbeddingRecordInput[],
   ): Promise<RawFaceEmbeddingEntity[]>;

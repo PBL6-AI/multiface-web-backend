@@ -1,6 +1,10 @@
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { REPOSITORY_TOKENS } from '../../../common/constants';
-import { ApprovalStatus, FaceImagePose } from '../../../common/domain/enums';
+import {
+  ApprovalStatus,
+  FaceImagePose,
+  FaceRegistrationSessionStatus,
+} from '../../../common/domain/enums';
 import { In, Repository } from 'typeorm';
 import type {
   CreateFaceImageRecordInput,
@@ -26,16 +30,16 @@ export class TypeOrmFacesRepository implements FacesRepository {
     private readonly faceEmbeddingsRepository: Repository<FaceEmbeddingEntity>,
   ) {}
 
-  async findRequestById(
-    requestId: number,
+  async findSessionById(
+    sessionId: number,
   ): Promise<RawFaceRegistrationRequestEntity | null> {
     return this.faceRegistrationRequestsRepository.findOne({
-      where: { id: requestId },
+      where: { id: sessionId },
       relations: this.requestRelations,
     });
   }
 
-  async findLatestRequestByStudentId(
+  async findLatestSessionByStudentId(
     studentId: number,
   ): Promise<RawFaceRegistrationRequestEntity | null> {
     return this.faceRegistrationRequestsRepository.findOne({
@@ -45,30 +49,36 @@ export class TypeOrmFacesRepository implements FacesRepository {
     });
   }
 
-  async findPendingRequestByStudentId(
+  async findActiveSessionByStudentId(
     studentId: number,
   ): Promise<RawFaceRegistrationRequestEntity | null> {
     return this.faceRegistrationRequestsRepository.findOne({
       where: {
         studentId,
-        status: ApprovalStatus.PENDING,
+        sessionStatus: FaceRegistrationSessionStatus.COLLECTING,
       },
       relations: this.requestRelations,
       order: { createdAt: 'DESC' },
     });
   }
 
-  async createRequest(
+  async createSession(
     input: CreateFaceRegistrationRequestRecordInput,
   ): Promise<RawFaceRegistrationRequestEntity> {
     const savedRequest = await this.faceRegistrationRequestsRepository.save(
       this.faceRegistrationRequestsRepository.create({
         studentId: input.studentId,
         status: input.status ?? ApprovalStatus.PENDING,
+        sessionStatus:
+          input.sessionStatus ?? FaceRegistrationSessionStatus.COLLECTING,
+        embeddingStatus: input.embeddingStatus,
+        targetCountPerPose: input.targetCountPerPose ?? 20,
+        completedAt: input.completedAt ?? null,
+        metadata: input.metadata ?? null,
       }),
     );
 
-    const request = await this.findRequestById(savedRequest.id);
+    const request = await this.findSessionById(savedRequest.id);
 
     if (!request) {
       throw new Error('Face registration request was created but not reloaded');
@@ -77,7 +87,7 @@ export class TypeOrmFacesRepository implements FacesRepository {
     return request;
   }
 
-  async createFaceImage(
+  async createSample(
     input: CreateFaceImageRecordInput,
   ): Promise<RawFaceImageEntity> {
     return this.faceImagesRepository.save(
@@ -99,28 +109,29 @@ export class TypeOrmFacesRepository implements FacesRepository {
     );
   }
 
-  async findRequestImageByPose(
+  async countSessionSamplesByPose(
     requestId: number,
     pose: FaceImagePose,
-  ): Promise<RawFaceImageEntity | null> {
-    return this.faceImagesRepository.findOne({
+  ): Promise<number> {
+    return this.faceImagesRepository.count({
       where: { requestId, pose },
-      relations: this.faceImageRelations,
     });
   }
 
-  async countRequestImages(requestId: number): Promise<number> {
+  async countSessionSamples(requestId: number): Promise<number> {
     return this.faceImagesRepository.count({
       where: { requestId },
     });
   }
 
-  async listRequests(
+  async listSessions(
     options?: ListFaceRegistrationRequestsOptions,
   ): Promise<RawFaceRegistrationRequestEntity[]> {
     const where = {
       ...(options?.studentId ? { studentId: options.studentId } : {}),
-      ...(options?.status ? { status: options.status } : {}),
+      ...(options?.sessionStatus
+        ? { sessionStatus: options.sessionStatus }
+        : {}),
     };
 
     return this.faceRegistrationRequestsRepository.find({
@@ -130,12 +141,12 @@ export class TypeOrmFacesRepository implements FacesRepository {
     });
   }
 
-  async saveRequest(
+  async saveSession(
     request: RawFaceRegistrationRequestEntity,
   ): Promise<RawFaceRegistrationRequestEntity> {
     const savedRequest =
       await this.faceRegistrationRequestsRepository.save(request);
-    const reloadedRequest = await this.findRequestById(savedRequest.id);
+    const reloadedRequest = await this.findSessionById(savedRequest.id);
 
     if (!reloadedRequest) {
       throw new Error('Face registration request was saved but not reloaded');
@@ -144,7 +155,7 @@ export class TypeOrmFacesRepository implements FacesRepository {
     return reloadedRequest;
   }
 
-  async saveImages(
+  async saveSamples(
     images: RawFaceImageEntity[],
   ): Promise<RawFaceImageEntity[]> {
     return this.faceImagesRepository.save(images);

@@ -7,8 +7,13 @@ import {
   ManyToOne,
   OneToMany,
   PrimaryGeneratedColumn,
+  UpdateDateColumn,
 } from 'typeorm';
-import { ApprovalStatus } from './enums';
+import {
+  ApprovalStatus,
+  FaceRegistrationEmbeddingStatus,
+  FaceRegistrationSessionStatus,
+} from './enums';
 import { FaceImageEntity } from './face-image.entity';
 import { UserEntity } from './user.entity';
 
@@ -25,6 +30,7 @@ export class FaceRegistrationRequestEntity {
   @Column({ name: 'student_id', type: 'int' })
   studentId: number;
 
+  // Legacy approval status retained for backward-compatible schema rollout.
   @Column({
     name: 'status',
     type: 'enum',
@@ -42,8 +48,40 @@ export class FaceRegistrationRequestEntity {
   @Column({ name: 'rejection_reason', type: 'text', nullable: true })
   rejectionReason: string | null;
 
+  @Column({
+    name: 'session_status',
+    type: 'varchar',
+    length: 50,
+    default: FaceRegistrationSessionStatus.COLLECTING,
+  })
+  sessionStatus: FaceRegistrationSessionStatus;
+
+  @Column({
+    name: 'embedding_status',
+    type: 'varchar',
+    length: 50,
+    default: FaceRegistrationEmbeddingStatus.NOT_STARTED,
+  })
+  embeddingStatus: FaceRegistrationEmbeddingStatus;
+
+  @Column({
+    name: 'target_count_per_pose',
+    type: 'int',
+    default: 20,
+  })
+  targetCountPerPose: number;
+
+  @Column({ name: 'completed_at', type: 'timestamp', nullable: true })
+  completedAt: Date | null;
+
+  @Column({ name: 'metadata', type: 'jsonb', nullable: true })
+  metadata: Record<string, unknown> | null;
+
   @CreateDateColumn({ name: 'created_at', type: 'timestamp' })
   createdAt: Date;
+
+  @UpdateDateColumn({ name: 'updated_at', type: 'timestamp' })
+  updatedAt: Date;
 
   @ManyToOne(() => UserEntity, (user) => user.faceRegistrationRequests, {
     onDelete: 'CASCADE',

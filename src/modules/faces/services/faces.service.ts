@@ -7,7 +7,12 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { REPOSITORY_TOKENS } from '../../../common/constants';
-import { ApprovalStatus, FaceImagePose } from '../../../common/domain/enums';
+import {
+  ApprovalStatus,
+  FaceImagePose,
+  FaceRegistrationEmbeddingStatus,
+  FaceRegistrationSessionStatus,
+} from '../../../common/domain/enums';
 import type {
   FacesRepository,
   RawFaceImageEntity,
@@ -18,10 +23,11 @@ import type { FaceAiProvider } from '../../ai-integration';
 import type { AuthenticatedUser } from '../../auth/interfaces';
 import { FilesService } from '../../files/services';
 import {
-  FaceRegistrationRequestResponseDto,
-  ListFaceRegistrationRequestsQueryDto,
-  ReviewFaceRegistrationRequestDto,
-  UploadFaceRegistrationImageDto,
+  BuildFaceRegistrationEmbeddingsDto,
+  CreateFaceRegistrationSessionDto,
+  FaceRegistrationEmbeddingsBuildResponseDto,
+  FaceRegistrationSessionResponseDto,
+  UploadFaceRegistrationSampleDto,
 } from '../dtos';
 import { FACE_REGISTRATION_REQUIRED_POSES } from '../faces.constants';
 
@@ -42,72 +48,63 @@ export class FacesService {
     private readonly aiProvider: FaceAiProvider,
   ) {}
 
-  async createRequest(
+  async createSession(
     currentUser: AuthenticatedUser,
-  ): Promise<FaceRegistrationRequestResponseDto> {
-    const existingPendingRequest =
-      await this.facesRepository.findPendingRequestByStudentId(currentUser.id);
+    dto: CreateFaceRegistrationSessionDto,
+  ): Promise<FaceRegistrationSessionResponseDto> {
+    const existingCollectingSession =
+      await this.facesRepository.findActiveSessionByStudentId(currentUser.id);
 
-    if (existingPendingRequest) {
+    if (existingCollectingSession) {
       throw new ConflictException(
-        'A pending face registration request already exists for this student',
+        'A collecting face registration session already exists for this student',
       );
     }
 
-    const request = await this.facesRepository.createRequest({
+    const session = await this.facesRepository.createSession({
       studentId: currentUser.id,
+      status: ApprovalStatus.PENDING,
+      sessionStatus: FaceRegistrationSessionStatus.COLLECTING,
+      embeddingStatus: FaceRegistrationEmbeddingStatus.NOT_STARTED,
+      targetCountPerPose: dto.targetCountPerPose ?? 20,
+      metadata: {
+        registrationFlow: 'continuous_multi_sample_capture',
+      },
     });
 
-    return await this.serializeRequest(request);
+    return this.serializeSession(session);
   }
 
-  async getLatestRequestForStudent(
+  async getLatestSessionForStudent(
     currentUser: AuthenticatedUser,
-  ): Promise<FaceRegistrationRequestResponseDto> {
-    const request = await this.facesRepository.findLatestRequestByStudentId(
+  ): Promise<FaceRegistrationSessionResponseDto> {
+    const session = await this.facesRepository.findLatestSessionByStudentId(
       currentUser.id,
     );
 
-    if (!request) {
-      throw new NotFoundException('No face registration request found');
+    if (!session) {
+      throw new NotFoundException('No face registration session found');
     }
 
-    return await this.serializeRequest(request);
+    return this.serializeSession(session);
   }
 
-  async getRequestByIdForUser(
-    requestId: number,
+  async getSessionByIdForUser(
+    sessionId: number,
     currentUser: AuthenticatedUser,
-  ): Promise<FaceRegistrationRequestResponseDto> {
-    const request = await this.findRequestOrThrow(requestId);
+  ): Promise<FaceRegistrationSessionResponseDto> {
+    const session = await this.findSessionOrThrow(sessionId);
+    this.ensureCanAccessSession(currentUser, session);
 
-    if (currentUser.role !== 'admin' && request.studentId !== currentUser.id) {
-      throw new ForbiddenException(
-        'You do not have permission to access this face registration request',
-      );
-    }
-
-    return await this.serializeRequest(request);
+    return this.serializeSession(session);
   }
 
-  async listRequests(
-    query: ListFaceRegistrationRequestsQueryDto,
-  ): Promise<FaceRegistrationRequestResponseDto[]> {
-    const requests = await this.facesRepository.listRequests({
-      status: query.status,
-    });
-
-    return Promise.all(
-      requests.map((request) => this.serializeRequest(request)),
-    );
-  }
-
-  async uploadRequestImage(
-    requestId: number,
+  async uploadSessionSample(
+    sessionId: number,
     currentUser: AuthenticatedUser,
     file: UploadableFile,
-    uploadFaceRegistrationImageDto: UploadFaceRegistrationImageDto,
-  ): Promise<FaceRegistrationRequestResponseDto> {
+    dto: UploadFaceRegistrationSampleDto,
+  ): Promise<FaceRegistrationSessionResponseDto> {
     if (!file.buffer.length) {
       throw new BadRequestException('Uploaded image cannot be empty');
     }
@@ -116,261 +113,157 @@ export class FacesService {
       throw new BadRequestException('Uploaded file must be an image');
     }
 
-    const request = await this.findRequestOrThrow(requestId);
+    const session = await this.findSessionOrThrow(sessionId);
 
-    if (request.studentId !== currentUser.id) {
+    if (session.studentId !== currentUser.id) {
       throw new ForbiddenException(
-        'You can only upload face images to your own registration request',
+        'You can only upload samples to your own face registration session',
       );
     }
 
-    if (request.status !== ApprovalStatus.PENDING) {
+    if (session.sessionStatus !== FaceRegistrationSessionStatus.COLLECTING) {
       throw new ConflictException(
-        'Only pending face registration requests can receive new images',
+        'Only collecting face registration sessions can receive new samples',
       );
     }
 
-    const existingPoseImage = await this.facesRepository.findRequestImageByPose(
-      requestId,
-      uploadFaceRegistrationImageDto.pose,
-    );
+    const poseSampleCount =
+      await this.facesRepository.countSessionSamplesByPose(sessionId, dto.pose);
 
-    if (existingPoseImage) {
+    if (poseSampleCount >= session.targetCountPerPose) {
       throw new ConflictException(
-        `Pose "${uploadFaceRegistrationImageDto.pose}" has already been uploaded for this request`,
+        `Pose "${dto.pose}" already reached the target sample count`,
       );
     }
 
-    const currentImageCount =
-      await this.facesRepository.countRequestImages(requestId);
-
-    if (currentImageCount >= FACE_REGISTRATION_REQUIRED_POSES.length) {
-      throw new ConflictException(
-        'This face registration request already has enough images',
-      );
-    }
-
-    const storedFile = await this.filesService.storeUploadedFile({
+    const rawFile = await this.filesService.storeUploadedFile({
       uploaderId: currentUser.id,
       file,
-      category: `face_registration_raw/${uploadFaceRegistrationImageDto.pose}`,
-      checksum: uploadFaceRegistrationImageDto.checksum ?? null,
+      category: `face_registration_raw/${dto.pose}`,
     });
 
-    await this.facesRepository.createFaceImage({
+    const alignedFileId = dto.alignedImageBase64
+      ? (
+          await this.storeAlignedImage(
+            currentUser.id,
+            dto.pose,
+            dto.alignedImageBase64,
+          )
+        ).id
+      : null;
+
+    await this.facesRepository.createSample({
       studentId: currentUser.id,
-      requestId,
-      fileId: storedFile.id,
-      pose: uploadFaceRegistrationImageDto.pose,
-      captureSource:
-        uploadFaceRegistrationImageDto.captureSource ?? 'web_registration',
-      qualityScore: uploadFaceRegistrationImageDto.qualityScore ?? null,
-      capturedAt: uploadFaceRegistrationImageDto.capturedAt
-        ? new Date(uploadFaceRegistrationImageDto.capturedAt)
-        : new Date(),
-      metadata: {
-        registrationFlow: 'five_pose_capture',
-        pose: uploadFaceRegistrationImageDto.pose,
-      },
+      requestId: sessionId,
+      fileId: rawFile.id,
+      alignedFileId,
+      pose: dto.pose,
+      status: ApprovalStatus.APPROVED,
+      captureSource: dto.captureSource ?? 'web_realtime_ai_registration',
+      qualityScore: dto.qualityScore ?? null,
+      capturedAt: dto.capturedAt ? new Date(dto.capturedAt) : new Date(),
+      metadata: this.buildSampleMetadata(dto),
     });
 
-    const updatedRequest = await this.findRequestOrThrow(requestId);
-
-    return await this.serializeRequest(updatedRequest);
+    return this.serializeSession(await this.findSessionOrThrow(sessionId));
   }
 
-  async reviewRequest(
-    requestId: number,
-    reviewer: AuthenticatedUser,
-    reviewFaceRegistrationRequestDto: ReviewFaceRegistrationRequestDto,
-  ): Promise<FaceRegistrationRequestResponseDto> {
-    const request = await this.findRequestOrThrow(requestId);
+  async completeSession(
+    sessionId: number,
+    currentUser: AuthenticatedUser,
+  ): Promise<FaceRegistrationSessionResponseDto> {
+    const session = await this.findSessionOrThrow(sessionId);
 
-    if (request.status !== ApprovalStatus.PENDING) {
+    if (session.studentId !== currentUser.id) {
+      throw new ForbiddenException(
+        'You can only complete your own face registration session',
+      );
+    }
+
+    if (session.sessionStatus !== FaceRegistrationSessionStatus.COLLECTING) {
+      throw new ConflictException('Only collecting sessions can be completed');
+    }
+
+    const counts = await this.getSampleCountByPose(session);
+    const incompletePose = FACE_REGISTRATION_REQUIRED_POSES.find(
+      (pose) => counts[pose] < session.targetCountPerPose,
+    );
+
+    if (incompletePose) {
+      throw new BadRequestException(
+        `Pose "${incompletePose}" has not reached the target sample count yet`,
+      );
+    }
+
+    session.sessionStatus = FaceRegistrationSessionStatus.COMPLETED;
+    session.completedAt = new Date();
+    session.embeddingStatus = FaceRegistrationEmbeddingStatus.NOT_STARTED;
+
+    await this.facesRepository.saveSession(session);
+
+    return this.serializeSession(await this.findSessionOrThrow(sessionId));
+  }
+
+  async buildEmbeddingsForSession(
+    sessionId: number,
+    currentUser: AuthenticatedUser,
+    dto: BuildFaceRegistrationEmbeddingsDto,
+  ): Promise<FaceRegistrationEmbeddingsBuildResponseDto> {
+    const session = await this.findSessionOrThrow(sessionId);
+    this.ensureCanAccessSession(currentUser, session);
+
+    if (
+      ![
+        FaceRegistrationSessionStatus.COMPLETED,
+        FaceRegistrationSessionStatus.EMBEDDING_FAILED,
+        FaceRegistrationSessionStatus.EMBEDDING_COMPLETED,
+      ].includes(session.sessionStatus)
+    ) {
       throw new ConflictException(
-        'Only pending face registration requests can be reviewed',
+        'Embeddings can only be built after the session is completed',
       );
     }
 
-    if (
-      reviewFaceRegistrationRequestDto.status === ApprovalStatus.APPROVED &&
-      request.faceImages.length !== FACE_REGISTRATION_REQUIRED_POSES.length
-    ) {
+    const samples = this.sortSamples(session.faceImages);
+    if (!samples.length) {
       throw new BadRequestException(
-        `An approved face registration request must contain exactly ${FACE_REGISTRATION_REQUIRED_POSES.length} images`,
+        'Cannot build embeddings for a session without samples',
       );
     }
 
-    const rejectionReason =
-      reviewFaceRegistrationRequestDto.rejectionReason?.trim() || null;
-
-    if (
-      reviewFaceRegistrationRequestDto.status === ApprovalStatus.REJECTED &&
-      !rejectionReason
-    ) {
-      throw new BadRequestException(
-        'A rejection reason is required when rejecting a face registration request',
-      );
-    }
-
-    const reviewedAt = new Date();
-
-    request.status = reviewFaceRegistrationRequestDto.status;
-    request.reviewedById = reviewer.id;
-    request.reviewedAt = reviewedAt;
-    request.rejectionReason =
-      reviewFaceRegistrationRequestDto.status === ApprovalStatus.REJECTED
-        ? rejectionReason
-        : null;
-
-    for (const image of request.faceImages) {
-      image.status = reviewFaceRegistrationRequestDto.status;
-      image.reviewedById = reviewer.id;
-      image.reviewedAt = reviewedAt;
-      image.rejectionReason =
-        reviewFaceRegistrationRequestDto.status === ApprovalStatus.REJECTED
-          ? rejectionReason
-          : null;
-
-      if (reviewFaceRegistrationRequestDto.status === ApprovalStatus.APPROVED) {
-        image.metadata = this.withEmbeddingMetadata(image, {
-          status: 'queued',
-          updatedAt: reviewedAt.toISOString(),
-        });
-      }
-    }
-
-    await this.facesRepository.saveImages(request.faceImages);
-
-    await this.facesRepository.saveRequest(request);
-
-    if (reviewFaceRegistrationRequestDto.status === ApprovalStatus.APPROVED) {
-      await this.processEmbeddingsForApprovedRequest(request.id);
-    }
-
-    const updatedRequest = await this.findRequestOrThrow(requestId);
-
-    return await this.serializeRequest(updatedRequest);
-  }
-
-  async serializeRequest(
-    request: RawFaceRegistrationRequestEntity,
-  ): Promise<FaceRegistrationRequestResponseDto> {
-    const sortedImages = [...request.faceImages].sort((left, right) => {
-      const poseOrderDifference =
-        this.poseOrder(left.pose) - this.poseOrder(right.pose);
-
-      if (poseOrderDifference !== 0) {
-        return poseOrderDifference;
-      }
-
-      return left.createdAt.getTime() - right.createdAt.getTime();
-    });
-
-    const completedPoses = sortedImages.map((image) => image.pose);
-    const missingPoses = FACE_REGISTRATION_REQUIRED_POSES.filter(
-      (pose) => !completedPoses.includes(pose),
-    );
-    const approvedImages = sortedImages.filter(
-      (image) => image.status === ApprovalStatus.APPROVED,
-    );
-    const embeddedImages = approvedImages.filter(
-      (image) => (image.embeddings?.length ?? 0) > 0,
-    );
-
-    return {
-      id: request.id,
-      studentId: request.studentId,
-      status: request.status,
-      reviewedById: request.reviewedById,
-      reviewedAt: request.reviewedAt,
-      rejectionReason: request.rejectionReason,
-      createdAt: request.createdAt,
-      uploadedPoseCount: sortedImages.length,
-      requiredPoseCount: FACE_REGISTRATION_REQUIRED_POSES.length,
-      embeddedPoseCount: embeddedImages.length,
-      requiredEmbeddingCount: FACE_REGISTRATION_REQUIRED_POSES.length,
-      embeddingStatus: this.resolveRequestEmbeddingStatus(
-        request,
-        approvedImages,
-      ),
-      completedPoses,
-      missingPoses,
-      images: await Promise.all(
-        sortedImages.map((image) => this.serializeImage(image)),
-      ),
-    };
-  }
-
-  private async serializeImage(image: RawFaceImageEntity) {
-    return {
-      id: image.id,
-      pose: image.pose,
-      status: image.status,
-      captureSource: image.captureSource,
-      capturedAt: image.capturedAt,
-      qualityScore: image.qualityScore,
-      createdAt: image.createdAt,
-      embeddingStatus: this.resolveImageEmbeddingStatus(image),
-      file: await this.filesService.serializeUploadedFileWithSignedUrl(
-        image.file,
-      ),
-    };
-  }
-
-  private async findRequestOrThrow(
-    requestId: number,
-  ): Promise<RawFaceRegistrationRequestEntity> {
-    const request = await this.facesRepository.findRequestById(requestId);
-
-    if (!request) {
-      throw new NotFoundException('Face registration request not found');
-    }
-
-    return request;
-  }
-
-  private poseOrder(pose: FaceImagePose): number {
-    return FACE_REGISTRATION_REQUIRED_POSES.indexOf(pose);
-  }
-
-  private async processEmbeddingsForApprovedRequest(
-    requestId: number,
-  ): Promise<void> {
-    const request = await this.findRequestOrThrow(requestId);
-    const approvedImages = request.faceImages.filter(
-      (image) => image.status === ApprovalStatus.APPROVED,
-    );
-
-    if (!approvedImages.length) {
-      return;
-    }
+    session.sessionStatus = FaceRegistrationSessionStatus.EMBEDDING_PENDING;
+    session.embeddingStatus = FaceRegistrationEmbeddingStatus.PENDING;
+    await this.facesRepository.saveSession(session);
 
     try {
+      if (dto.replaceExisting !== false) {
+        await this.facesRepository.deleteEmbeddingsByFaceImageIds(
+          samples.map((sample) => sample.id),
+        );
+      }
+
       const result = await this.aiProvider.generateFaceEmbeddings({
-        requestId: request.id,
-        studentId: request.studentId,
+        requestId: session.id,
+        studentId: session.studentId,
         images: await Promise.all(
-          approvedImages.map(async (image) => {
+          samples.map(async (sample) => {
+            const sourceFile = sample.alignedFile ?? sample.file;
             const serialized =
               await this.filesService.serializeUploadedFileWithSignedUrl(
-                image.file,
+                sourceFile,
               );
             return {
-              faceImageId: image.id,
+              faceImageId: sample.id,
               url: serialized.url,
-              pose: image.pose,
+              pose: sample.pose,
             };
           }),
         ),
       });
 
-      await this.facesRepository.deleteEmbeddingsByFaceImageIds(
-        approvedImages.map((image) => image.id),
-      );
       await this.facesRepository.createEmbeddings(
         result.embeddings.map((embedding) => ({
-          studentId: request.studentId,
+          studentId: session.studentId,
           faceImageId: embedding.faceImageId,
           embedding: embedding.embedding,
           modelName: embedding.modelName,
@@ -384,122 +277,186 @@ export class FacesService {
         })),
       );
 
-      for (const image of approvedImages) {
-        // Clear stale embeddings relation in memory to prevent TypeORM from
-        // trying to update/nullify them after they were deleted from DB.
-        image.embeddings = [];
+      session.sessionStatus = FaceRegistrationSessionStatus.EMBEDDING_COMPLETED;
+      session.embeddingStatus = FaceRegistrationEmbeddingStatus.COMPLETED;
+      await this.facesRepository.saveSession(session);
 
-        const embedding = result.embeddings.find(
-          (item) => item.faceImageId === image.id,
-        );
-
-        image.metadata = this.withEmbeddingMetadata(image, {
-          status: embedding ? 'completed' : 'failed',
-          updatedAt: new Date().toISOString(),
-          modelName: embedding?.modelName ?? null,
-          modelVersion: embedding?.modelVersion ?? null,
-        });
-      }
-
-      await this.facesRepository.saveImages(approvedImages);
+      return {
+        sessionId: session.id,
+        requestedSampleCount: samples.length,
+        generatedEmbeddingCount: result.embeddings.length,
+        status: session.sessionStatus,
+        embeddingStatus: session.embeddingStatus,
+      };
     } catch (error) {
-      for (const image of approvedImages) {
-        image.embeddings = []; // Safety clear here too
-        image.metadata = this.withEmbeddingMetadata(image, {
-          status: 'failed',
-          updatedAt: new Date().toISOString(),
-          reason:
-            error instanceof Error
-              ? error.message
-              : 'Unknown embedding generation error',
-        });
-      }
-
-      await this.facesRepository.saveImages(approvedImages);
+      session.sessionStatus = FaceRegistrationSessionStatus.EMBEDDING_FAILED;
+      session.embeddingStatus = FaceRegistrationEmbeddingStatus.FAILED;
+      session.metadata = {
+        ...(session.metadata ?? {}),
+        lastEmbeddingFailure:
+          error instanceof Error ? error.message : 'Unknown embedding failure',
+      };
+      await this.facesRepository.saveSession(session);
+      throw error;
     }
   }
 
-  private resolveRequestEmbeddingStatus(
-    request: RawFaceRegistrationRequestEntity,
-    approvedImages: RawFaceImageEntity[],
-  ): string {
-    if (request.status === ApprovalStatus.REJECTED) {
-      return 'not_available';
-    }
-
-    if (request.status !== ApprovalStatus.APPROVED) {
-      return 'not_requested';
-    }
-
-    if (!approvedImages.length) {
-      return 'queued';
-    }
-
-    const statuses = approvedImages.map((image) =>
-      this.resolveImageEmbeddingStatus(image),
-    );
-
-    if (statuses.every((status) => status === 'completed')) {
-      return 'completed';
-    }
-
-    if (statuses.some((status) => status === 'failed')) {
-      return 'partial_failed';
-    }
-
-    if (statuses.some((status) => status === 'completed')) {
-      return 'processing';
-    }
-
-    return 'queued';
-  }
-
-  private resolveImageEmbeddingStatus(image: RawFaceImageEntity): string {
-    if ((image.embeddings?.length ?? 0) > 0) {
-      return 'completed';
-    }
-
-    const metadata = image.metadata;
-    const embeddingMetadata =
-      metadata && typeof metadata === 'object' && 'embedding' in metadata
-        ? metadata.embedding
-        : null;
-
-    if (embeddingMetadata && typeof embeddingMetadata === 'object') {
-      const status =
-        'status' in embeddingMetadata ? embeddingMetadata.status : null;
-
-      if (typeof status === 'string') {
-        return status;
-      }
-    }
-
-    return image.status === ApprovalStatus.APPROVED
-      ? 'queued'
-      : 'not_requested';
-  }
-
-  private withEmbeddingMetadata(
-    image: RawFaceImageEntity,
-    payload: Record<string, unknown>,
-  ): Record<string, unknown> {
-    const existingMetadata =
-      image.metadata && typeof image.metadata === 'object'
-        ? image.metadata
-        : {};
-    const existingEmbeddingMetadata =
-      'embedding' in existingMetadata &&
-      existingMetadata.embedding &&
-      typeof existingMetadata.embedding === 'object'
-        ? (existingMetadata.embedding as Record<string, unknown>)
-        : {};
+  private async serializeSession(
+    session: RawFaceRegistrationRequestEntity,
+  ): Promise<FaceRegistrationSessionResponseDto> {
+    const samples = this.sortSamples(session.faceImages);
+    const sampleCountByPose = await this.getSampleCountByPose(session);
+    const requiredTotalSamples =
+      FACE_REGISTRATION_REQUIRED_POSES.length * session.targetCountPerPose;
 
     return {
-      ...existingMetadata,
-      embedding: {
-        ...existingEmbeddingMetadata,
-        ...payload,
-      },
+      id: session.id,
+      studentId: session.studentId,
+      status: session.sessionStatus,
+      embeddingStatus: session.embeddingStatus,
+      currentPose: this.resolveCurrentPose(sampleCountByPose, session),
+      targetCountPerPose: session.targetCountPerPose,
+      requiredTotalSamples,
+      totalAcceptedSamples: samples.length,
+      sampleCountByPose,
+      createdAt: session.createdAt,
+      completedAt: session.completedAt,
+      updatedAt: session.updatedAt,
+      samples: await Promise.all(
+        samples.map(async (sample) => ({
+          id: sample.id,
+          pose: sample.pose,
+          captureSource: sample.captureSource,
+          capturedAt: sample.capturedAt,
+          qualityScore: sample.qualityScore,
+          createdAt: sample.createdAt,
+          rawFile: await this.filesService.serializeUploadedFileWithSignedUrl(
+            sample.file,
+          ),
+          alignedFile: sample.alignedFile
+            ? await this.filesService.serializeUploadedFileWithSignedUrl(
+                sample.alignedFile,
+              )
+            : null,
+          metadata: sample.metadata,
+        })),
+      ),
+      metadata: session.metadata,
     };
+  }
+
+  private ensureCanAccessSession(
+    currentUser: AuthenticatedUser,
+    session: RawFaceRegistrationRequestEntity,
+  ) {
+    if (currentUser.role !== 'admin' && currentUser.id !== session.studentId) {
+      throw new ForbiddenException(
+        'You do not have permission to access this face registration session',
+      );
+    }
+  }
+
+  private async findSessionOrThrow(
+    sessionId: number,
+  ): Promise<RawFaceRegistrationRequestEntity> {
+    const session = await this.facesRepository.findSessionById(sessionId);
+
+    if (!session) {
+      throw new NotFoundException('Face registration session not found');
+    }
+
+    return session;
+  }
+
+  private async getSampleCountByPose(
+    session: RawFaceRegistrationRequestEntity,
+  ): Promise<Record<FaceImagePose, number>> {
+    const initial = Object.fromEntries(
+      FACE_REGISTRATION_REQUIRED_POSES.map((pose) => [pose, 0]),
+    ) as Record<FaceImagePose, number>;
+
+    for (const sample of session.faceImages) {
+      initial[sample.pose] = (initial[sample.pose] ?? 0) + 1;
+    }
+
+    return initial;
+  }
+
+  private resolveCurrentPose(
+    sampleCountByPose: Record<FaceImagePose, number>,
+    session: RawFaceRegistrationRequestEntity,
+  ): FaceImagePose | null {
+    return (
+      FACE_REGISTRATION_REQUIRED_POSES.find(
+        (pose) => sampleCountByPose[pose] < session.targetCountPerPose,
+      ) ?? null
+    );
+  }
+
+  private sortSamples(samples: RawFaceImageEntity[]): RawFaceImageEntity[] {
+    return [...samples].sort(
+      (left, right) => left.createdAt.getTime() - right.createdAt.getTime(),
+    );
+  }
+
+  private buildSampleMetadata(
+    dto: UploadFaceRegistrationSampleDto,
+  ): Record<string, unknown> {
+    return {
+      registrationFlow: 'continuous_multi_sample_capture',
+      pose: dto.pose,
+      aiValidated: dto.aiValidated ?? true,
+      detectionScore: dto.detectionScore ?? null,
+      faceCount: dto.faceCount ?? null,
+      estimatedPose: dto.estimatedPose ?? null,
+      bbox: this.tryParseJson(dto.bbox) ?? dto.bbox ?? null,
+      landmarks: this.tryParseJson(dto.landmarks) ?? dto.landmarks ?? null,
+      aiMetadata: this.tryParseJson(dto.aiMetadata) ?? dto.aiMetadata ?? null,
+    };
+  }
+
+  private async storeAlignedImage(
+    uploaderId: number,
+    pose: FaceImagePose,
+    base64DataUrl: string,
+  ) {
+    const parsed = this.parseDataUrl(base64DataUrl);
+    return this.filesService.storeUploadedFile({
+      uploaderId,
+      category: `face_registration_aligned/${pose}`,
+      file: {
+        originalname: `aligned-${pose}.jpg`,
+        mimetype: parsed.mimeType,
+        size: parsed.buffer.length,
+        buffer: parsed.buffer,
+      },
+    });
+  }
+
+  private parseDataUrl(dataUrl: string): { mimeType: string; buffer: Buffer } {
+    const match = dataUrl.match(/^data:(.+);base64,(.+)$/);
+    if (!match) {
+      throw new BadRequestException(
+        'Invalid base64 data URL for aligned image',
+      );
+    }
+
+    const [, mimeType, payload] = match;
+    return {
+      mimeType,
+      buffer: Buffer.from(payload, 'base64'),
+    };
+  }
+
+  private tryParseJson(value: unknown): unknown {
+    if (typeof value !== 'string') {
+      return value;
+    }
+
+    try {
+      return JSON.parse(value);
+    } catch {
+      return value;
+    }
   }
 }

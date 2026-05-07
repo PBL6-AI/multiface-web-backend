@@ -1,164 +1,137 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { ApprovalStatus, FaceImagePose } from '../../../common/domain/enums';
+import {
+  FaceImagePose,
+  FaceRegistrationEmbeddingStatus,
+  FaceRegistrationSessionStatus,
+} from '../../../common/domain/enums';
 import { UploadedFileResponseDto } from '../../files/dtos';
 
-export class FaceRegistrationImageResponseDto {
-  @ApiProperty({
-    description: 'Face image record identifier',
-    example: 501,
-  })
-  id: number;
+class FaceSampleCountByPoseDto {
+  @ApiProperty({ example: 20 })
+  front: number;
 
-  @ApiProperty({
-    description: 'Pose label associated with the uploaded face image',
-    enum: FaceImagePose,
-    example: FaceImagePose.LEFT,
-  })
-  pose: FaceImagePose;
+  @ApiProperty({ example: 20 })
+  left: number;
 
-  @ApiProperty({
-    description: 'Review status of the face image',
-    enum: ApprovalStatus,
-    example: ApprovalStatus.PENDING,
-  })
-  status: ApprovalStatus;
+  @ApiProperty({ example: 20 })
+  right: number;
 
-  @ApiProperty({
-    description: 'Source label used when the face image was captured',
-    example: 'web_registration',
-  })
-  captureSource: string;
+  @ApiProperty({ example: 20 })
+  up: number;
 
-  @ApiProperty({
-    description: 'Captured timestamp, if provided by the client',
-    nullable: true,
-    example: '2026-04-16T14:10:00.000Z',
-  })
-  capturedAt: Date | null;
-
-  @ApiProperty({
-    description: 'Quality score provided during upload',
-    nullable: true,
-    example: 0.91,
-  })
-  qualityScore: number | null;
-
-  @ApiProperty({
-    description: 'Face image record creation timestamp',
-    example: '2026-04-16T14:10:01.000Z',
-  })
-  createdAt: Date;
-
-  @ApiProperty({
-    description: 'Embedding generation status for this face image',
-    example: 'completed',
-  })
-  embeddingStatus: string;
-
-  @ApiProperty({
-    description: 'Uploaded raw file metadata for this face image',
-    type: UploadedFileResponseDto,
-  })
-  file: UploadedFileResponseDto;
+  @ApiProperty({ example: 20 })
+  down: number;
 }
 
-export class FaceRegistrationRequestResponseDto {
-  @ApiProperty({
-    description: 'Face registration request identifier',
-    example: 101,
-  })
+export class FaceRegistrationSampleResponseDto {
+  @ApiProperty({ example: 501 })
   id: number;
 
+  @ApiProperty({ enum: FaceImagePose, example: FaceImagePose.FRONT })
+  pose: FaceImagePose;
+
+  @ApiProperty({ example: 'web_realtime_ai_registration' })
+  captureSource: string;
+
+  @ApiProperty({ nullable: true, example: '2026-05-07T15:03:21.000Z' })
+  capturedAt: Date | null;
+
+  @ApiProperty({ nullable: true, example: 0.87 })
+  qualityScore: number | null;
+
+  @ApiProperty({ example: '2026-05-07T15:03:22.000Z' })
+  createdAt: Date;
+
+  @ApiProperty({ type: UploadedFileResponseDto })
+  rawFile: UploadedFileResponseDto;
+
   @ApiProperty({
-    description: 'Student identifier that owns this request',
-    example: 12,
+    type: UploadedFileResponseDto,
+    nullable: true,
+    required: false,
   })
+  alignedFile: UploadedFileResponseDto | null;
+
+  @ApiProperty({ nullable: true, type: Object })
+  metadata: Record<string, unknown> | null;
+}
+
+export class FaceRegistrationSessionResponseDto {
+  @ApiProperty({ example: 101 })
+  id: number;
+
+  @ApiProperty({ example: 12 })
   studentId: number;
 
   @ApiProperty({
-    description: 'Current review status of the request',
-    enum: ApprovalStatus,
-    example: ApprovalStatus.PENDING,
+    enum: FaceRegistrationSessionStatus,
+    example: FaceRegistrationSessionStatus.COLLECTING,
   })
-  status: ApprovalStatus;
+  status: FaceRegistrationSessionStatus;
 
   @ApiProperty({
-    description: 'Reviewer identifier when the request has been reviewed',
+    enum: FaceRegistrationEmbeddingStatus,
+    example: FaceRegistrationEmbeddingStatus.NOT_STARTED,
+  })
+  embeddingStatus: FaceRegistrationEmbeddingStatus;
+
+  @ApiProperty({
+    enum: FaceImagePose,
     nullable: true,
-    example: 2,
+    example: FaceImagePose.LEFT,
   })
-  reviewedById: number | null;
+  currentPose: FaceImagePose | null;
 
-  @ApiProperty({
-    description: 'Time when the request was reviewed',
-    nullable: true,
-    example: '2026-04-16T14:30:00.000Z',
-  })
-  reviewedAt: Date | null;
+  @ApiProperty({ example: 20 })
+  targetCountPerPose: number;
 
-  @ApiProperty({
-    description: 'Reason provided when the request was rejected',
-    nullable: true,
-    example: 'Down pose was too dark, please retry.',
-  })
-  rejectionReason: string | null;
+  @ApiProperty({ example: 100 })
+  requiredTotalSamples: number;
 
-  @ApiProperty({
-    description: 'Creation timestamp of the request',
-    example: '2026-04-16T14:00:00.000Z',
-  })
+  @ApiProperty({ example: 67 })
+  totalAcceptedSamples: number;
+
+  @ApiProperty({ type: FaceSampleCountByPoseDto })
+  sampleCountByPose: Record<FaceImagePose, number>;
+
+  @ApiProperty({ example: '2026-05-07T15:00:00.000Z' })
   createdAt: Date;
 
-  @ApiProperty({
-    description: 'Number of poses uploaded for the request',
-    example: 3,
-  })
-  uploadedPoseCount: number;
+  @ApiProperty({ example: '2026-05-07T15:05:00.000Z', nullable: true })
+  completedAt: Date | null;
+
+  @ApiProperty({ example: '2026-05-07T15:05:03.000Z' })
+  updatedAt: Date;
 
   @ApiProperty({
-    description: 'Number of poses required to complete registration',
-    example: 5,
-  })
-  requiredPoseCount: number;
-
-  @ApiProperty({
-    description: 'Number of approved pose images that already have embeddings',
-    example: 5,
-  })
-  embeddedPoseCount: number;
-
-  @ApiProperty({
-    description: 'Number of embeddings expected before the template is ready',
-    example: 5,
-  })
-  requiredEmbeddingCount: number;
-
-  @ApiProperty({
-    description: 'Overall embedding pipeline status for the request',
-    example: 'completed',
-  })
-  embeddingStatus: string;
-
-  @ApiProperty({
-    description: 'Poses that have already been uploaded',
-    enum: FaceImagePose,
-    isArray: true,
-    example: [FaceImagePose.FRONT, FaceImagePose.LEFT, FaceImagePose.RIGHT],
-  })
-  completedPoses: FaceImagePose[];
-
-  @ApiProperty({
-    description: 'Poses still missing from the request',
-    enum: FaceImagePose,
-    isArray: true,
-    example: [FaceImagePose.UP, FaceImagePose.DOWN],
-  })
-  missingPoses: FaceImagePose[];
-
-  @ApiProperty({
-    description: 'Uploaded images that belong to the request',
-    type: FaceRegistrationImageResponseDto,
+    type: FaceRegistrationSampleResponseDto,
     isArray: true,
   })
-  images: FaceRegistrationImageResponseDto[];
+  samples: FaceRegistrationSampleResponseDto[];
+
+  @ApiProperty({ nullable: true, type: Object })
+  metadata: Record<string, unknown> | null;
+}
+
+export class FaceRegistrationEmbeddingsBuildResponseDto {
+  @ApiProperty({ example: 101 })
+  sessionId: number;
+
+  @ApiProperty({ example: 100 })
+  requestedSampleCount: number;
+
+  @ApiProperty({ example: 56 })
+  generatedEmbeddingCount: number;
+
+  @ApiProperty({
+    enum: FaceRegistrationSessionStatus,
+    example: FaceRegistrationSessionStatus.EMBEDDING_COMPLETED,
+  })
+  status: FaceRegistrationSessionStatus;
+
+  @ApiProperty({
+    enum: FaceRegistrationEmbeddingStatus,
+    example: FaceRegistrationEmbeddingStatus.COMPLETED,
+  })
+  embeddingStatus: FaceRegistrationEmbeddingStatus;
 }

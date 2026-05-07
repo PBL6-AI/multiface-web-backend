@@ -7,7 +7,6 @@ import {
   ManyToOne,
   OneToMany,
   PrimaryGeneratedColumn,
-  Unique,
 } from 'typeorm';
 import { ApprovalStatus } from './enums';
 import { FaceImagePose } from '../../../common/domain/enums';
@@ -17,7 +16,6 @@ import { FileEntity } from './file.entity';
 import { UserEntity } from './user.entity';
 
 @Entity('face_images')
-@Unique('UQ_face_images_request_pose', ['requestId', 'pose'])
 @Index('IDX_face_images_request_status_created', [
   'requestId',
   'status',

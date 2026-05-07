@@ -1,9 +1,9 @@
 import { Type } from 'class-transformer';
-import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import {
+  IsBoolean,
   IsDateString,
   IsEnum,
-  IsIn,
+  IsInt,
   IsNumber,
   IsOptional,
   IsString,
@@ -11,11 +11,11 @@ import {
   MaxLength,
   Min,
 } from 'class-validator';
-import { ApprovalStatus, FaceImagePose } from '../../../common/domain/enums';
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { FaceImagePose } from '../../../common/domain/enums';
 
-export class UploadFaceRegistrationImageDto {
+export class UploadFaceRegistrationSampleDto {
   @ApiProperty({
-    description: 'Pose of the face image being uploaded',
     enum: FaceImagePose,
     example: FaceImagePose.FRONT,
   })
@@ -23,19 +23,7 @@ export class UploadFaceRegistrationImageDto {
   pose: FaceImagePose;
 
   @ApiPropertyOptional({
-    description: 'Optional checksum for the uploaded face image',
-    example: 'sha256:front-image-hash',
-    maxLength: 255,
-  })
-  @IsOptional()
-  @IsString()
-  @MaxLength(255)
-  checksum?: string;
-
-  @ApiPropertyOptional({
-    description: 'Client-side capture source label',
-    example: 'web_registration',
-    maxLength: 50,
+    example: 'web_realtime_ai_registration',
   })
   @IsOptional()
   @IsString()
@@ -43,17 +31,14 @@ export class UploadFaceRegistrationImageDto {
   captureSource?: string;
 
   @ApiPropertyOptional({
-    description: 'Timestamp when the frame was captured on the client',
-    example: '2026-04-16T14:10:00.000Z',
+    example: '2026-05-07T15:03:21.000Z',
   })
   @IsOptional()
   @IsDateString()
   capturedAt?: string;
 
   @ApiPropertyOptional({
-    description:
-      'Optional quality score from the client, normalized from 0 to 1',
-    example: 0.91,
+    example: 0.87,
     minimum: 0,
     maximum: 1,
   })
@@ -63,35 +48,94 @@ export class UploadFaceRegistrationImageDto {
   @Min(0)
   @Max(1)
   qualityScore?: number;
-}
 
-export class ListFaceRegistrationRequestsQueryDto {
   @ApiPropertyOptional({
-    description: 'Optional filter by review status',
-    enum: ApprovalStatus,
-    example: ApprovalStatus.PENDING,
+    example: 0.96,
+    minimum: 0,
+    maximum: 1,
   })
   @IsOptional()
-  @IsEnum(ApprovalStatus)
-  status?: ApprovalStatus;
-}
-
-export class ReviewFaceRegistrationRequestDto {
-  @ApiProperty({
-    description: 'Review outcome for the registration request',
-    enum: [ApprovalStatus.APPROVED, ApprovalStatus.REJECTED],
-    example: ApprovalStatus.APPROVED,
-  })
-  @IsIn([ApprovalStatus.APPROVED, ApprovalStatus.REJECTED])
-  status: ApprovalStatus.APPROVED | ApprovalStatus.REJECTED;
+  @Type(() => Number)
+  @IsNumber()
+  @Min(0)
+  @Max(1)
+  detectionScore?: number;
 
   @ApiPropertyOptional({
-    description: 'Reason for rejection when the request is rejected',
-    example: 'Left pose is blurry, please retake all 5 images.',
-    maxLength: 1000,
+    example: 1,
+  })
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  faceCount?: number;
+
+  @ApiPropertyOptional({
+    example: FaceImagePose.FRONT,
+    enum: FaceImagePose,
+  })
+  @IsOptional()
+  @IsEnum(FaceImagePose)
+  estimatedPose?: FaceImagePose;
+
+  @ApiPropertyOptional({
+    description: 'Optional JSON string containing bbox information',
   })
   @IsOptional()
   @IsString()
-  @MaxLength(1000)
-  rejectionReason?: string;
+  bbox?: string;
+
+  @ApiPropertyOptional({
+    description: 'Optional JSON string containing landmark list',
+  })
+  @IsOptional()
+  @IsString()
+  landmarks?: string;
+
+  @ApiPropertyOptional({
+    example: true,
+  })
+  @IsOptional()
+  @Type(() => Boolean)
+  @IsBoolean()
+  aiValidated?: boolean;
+
+  @ApiPropertyOptional({
+    description:
+      'Optional aligned face image returned by AI as a base64 data URL',
+  })
+  @IsOptional()
+  @IsString()
+  alignedImageBase64?: string;
+
+  @ApiPropertyOptional({
+    description: 'Optional additional AI metadata for audit/debug',
+  })
+  @IsOptional()
+  @IsString()
+  aiMetadata?: string;
+}
+
+export class CreateFaceRegistrationSessionDto {
+  @ApiPropertyOptional({
+    description: 'Override samples required for each pose',
+    example: 20,
+    minimum: 1,
+  })
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  targetCountPerPose?: number;
+}
+
+export class BuildFaceRegistrationEmbeddingsDto {
+  @ApiPropertyOptional({
+    description:
+      'Whether to delete and regenerate previous embeddings for this session',
+    example: true,
+  })
+  @IsOptional()
+  @Type(() => Boolean)
+  @IsBoolean()
+  replaceExisting?: boolean;
 }

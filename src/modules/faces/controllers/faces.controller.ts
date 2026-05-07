@@ -6,9 +6,7 @@ import {
   HttpStatus,
   Param,
   ParseIntPipe,
-  Patch,
   Post,
-  Query,
   UploadedFile,
   UseGuards,
   UseInterceptors,
@@ -29,10 +27,11 @@ import { AuthGuard, RolesGuard } from '../../../common/guards';
 import { ApiSuccessResponseDoc } from '../../../common/swagger';
 import type { AuthenticatedUser } from '../../auth/interfaces';
 import {
-  FaceRegistrationRequestResponseDto,
-  ListFaceRegistrationRequestsQueryDto,
-  ReviewFaceRegistrationRequestDto,
-  UploadFaceRegistrationImageDto,
+  BuildFaceRegistrationEmbeddingsDto,
+  CreateFaceRegistrationSessionDto,
+  FaceRegistrationEmbeddingsBuildResponseDto,
+  FaceRegistrationSessionResponseDto,
+  UploadFaceRegistrationSampleDto,
 } from '../dtos';
 import { FacesService } from '../services';
 
@@ -48,7 +47,7 @@ type UploadedFilePayload = {
 @ApiUnauthorizedResponse({
   description: 'Authentication token is missing or invalid',
 })
-@Controller('face-registration/requests')
+@Controller('face-registration/sessions')
 export class FacesController {
   constructor(private readonly facesService: FacesService) {}
 
@@ -56,83 +55,60 @@ export class FacesController {
   @UseGuards(AuthGuard, RolesGuard)
   @Roles('student')
   @ApiOperation({
-    summary: 'Create a new face registration request for the current student',
+    summary: 'Create a new face registration session for the current student',
   })
   @ApiSuccessResponseDoc({
     status: HttpStatus.CREATED,
-    description: 'Face registration request created successfully',
-    model: FaceRegistrationRequestResponseDto,
+    description: 'Face registration session created successfully',
+    model: FaceRegistrationSessionResponseDto,
   })
   @ApiForbiddenResponse({
-    description: 'Only students can create face registration requests',
+    description: 'Only students can create face registration sessions',
   })
-  async createMyRequest(
+  async createSession(
     @CurrentUser() currentUser: AuthenticatedUser,
-  ): Promise<ApiSuccessResponse<FaceRegistrationRequestResponseDto>> {
-    return this.ok(await this.facesService.createRequest(currentUser));
+    @Body() body: CreateFaceRegistrationSessionDto,
+  ): Promise<ApiSuccessResponse<FaceRegistrationSessionResponseDto>> {
+    return this.ok(await this.facesService.createSession(currentUser, body));
   }
 
   @Get('me/latest')
   @UseGuards(AuthGuard, RolesGuard)
   @Roles('student')
   @ApiOperation({
-    summary: 'Get the latest face registration request for the current student',
+    summary: 'Get the latest face registration session for the current student',
   })
   @ApiSuccessResponseDoc({
-    description: 'Latest face registration request returned successfully',
-    model: FaceRegistrationRequestResponseDto,
+    description: 'Latest face registration session returned successfully',
+    model: FaceRegistrationSessionResponseDto,
   })
-  @ApiForbiddenResponse({
-    description:
-      'Only students can access their latest face registration request',
-  })
-  async getMyLatestRequest(
+  async getMyLatestSession(
     @CurrentUser() currentUser: AuthenticatedUser,
-  ): Promise<ApiSuccessResponse<FaceRegistrationRequestResponseDto>> {
+  ): Promise<ApiSuccessResponse<FaceRegistrationSessionResponseDto>> {
     return this.ok(
-      await this.facesService.getLatestRequestForStudent(currentUser),
+      await this.facesService.getLatestSessionForStudent(currentUser),
     );
-  }
-
-  @Get()
-  @UseGuards(AuthGuard, RolesGuard)
-  @Roles('admin')
-  @ApiOperation({
-    summary: 'List face registration requests for administrators',
-  })
-  @ApiSuccessResponseDoc({
-    description: 'Face registration requests returned successfully',
-    model: FaceRegistrationRequestResponseDto,
-    isArray: true,
-  })
-  @ApiForbiddenResponse({
-    description: 'Only administrators can list face registration requests',
-  })
-  async listRequests(
-    @Query() query: ListFaceRegistrationRequestsQueryDto,
-  ): Promise<ApiSuccessResponse<FaceRegistrationRequestResponseDto[]>> {
-    return this.ok(await this.facesService.listRequests(query));
   }
 
   @Get(':id')
   @UseGuards(AuthGuard)
   @ApiOperation({
-    summary: 'Get a face registration request by id',
+    summary: 'Get a face registration session by id',
   })
   @ApiSuccessResponseDoc({
-    description: 'Face registration request returned successfully',
-    model: FaceRegistrationRequestResponseDto,
+    description: 'Face registration session returned successfully',
+    model: FaceRegistrationSessionResponseDto,
   })
-  async getRequestById(
-    @Param('id', ParseIntPipe) requestId: number,
+  async getSessionById(
+    @Param('id', ParseIntPipe) sessionId: number,
     @CurrentUser() currentUser: AuthenticatedUser,
-  ): Promise<ApiSuccessResponse<FaceRegistrationRequestResponseDto>> {
+  ): Promise<ApiSuccessResponse<FaceRegistrationSessionResponseDto>> {
     return this.ok(
-      await this.facesService.getRequestByIdForUser(requestId, currentUser),
+      await this.facesService.getSessionByIdForUser(sessionId, currentUser),
     );
   }
 
-  @Post(':id/images')
+  @Post(':id/samples')
   @UseGuards(AuthGuard, RolesGuard)
   @Roles('student')
   @UseInterceptors(FileInterceptor('file'))
@@ -141,92 +117,105 @@ export class FacesController {
     schema: {
       type: 'object',
       properties: {
-        file: {
-          type: 'string',
-          format: 'binary',
-        },
+        file: { type: 'string', format: 'binary' },
         pose: {
           type: 'string',
           enum: ['front', 'left', 'right', 'up', 'down'],
-          example: 'front',
         },
-        checksum: {
+        captureSource: { type: 'string' },
+        capturedAt: { type: 'string', format: 'date-time' },
+        qualityScore: { type: 'number' },
+        detectionScore: { type: 'number' },
+        faceCount: { type: 'number' },
+        estimatedPose: {
           type: 'string',
-          example: 'sha256:front-image-hash',
+          enum: ['front', 'left', 'right', 'up', 'down'],
         },
-        captureSource: {
+        bbox: {
           type: 'string',
-          example: 'web_registration',
+          example: '{"x1":10,"y1":20,"x2":100,"y2":120}',
         },
-        capturedAt: {
+        landmarks: {
           type: 'string',
-          format: 'date-time',
-          example: '2026-04-16T14:10:00.000Z',
+          example:
+            '[{"x":10,"y":20},{"x":30,"y":22},{"x":20,"y":30},{"x":12,"y":40},{"x":28,"y":41}]',
         },
-        qualityScore: {
-          type: 'number',
-          example: 0.91,
-        },
+        aiValidated: { type: 'boolean' },
+        alignedImageBase64: { type: 'string' },
+        aiMetadata: { type: 'string', example: '{"reason":"valid"}' },
       },
       required: ['file', 'pose'],
     },
   })
   @ApiOperation({
-    summary: 'Upload one pose image for a face registration request',
+    summary:
+      'Upload one accepted registration sample for a face registration session',
   })
   @ApiSuccessResponseDoc({
     status: HttpStatus.CREATED,
-    description: 'Face image uploaded successfully',
-    model: FaceRegistrationRequestResponseDto,
+    description: 'Face registration sample uploaded successfully',
+    model: FaceRegistrationSessionResponseDto,
   })
-  @ApiForbiddenResponse({
-    description:
-      'Only students can upload images to their face registration requests',
-  })
-  async uploadRequestImage(
-    @Param('id', ParseIntPipe) requestId: number,
+  async uploadSessionSample(
+    @Param('id', ParseIntPipe) sessionId: number,
     @CurrentUser() currentUser: AuthenticatedUser,
     @UploadedFile() file: UploadedFilePayload | undefined,
-    @Body() uploadFaceRegistrationImageDto: UploadFaceRegistrationImageDto,
-  ): Promise<ApiSuccessResponse<FaceRegistrationRequestResponseDto>> {
+    @Body() body: UploadFaceRegistrationSampleDto,
+  ): Promise<ApiSuccessResponse<FaceRegistrationSessionResponseDto>> {
     if (!file) {
-      throw new BadRequestException('Uploaded face image is required');
+      throw new BadRequestException('Uploaded face sample is required');
     }
 
     return this.ok(
-      await this.facesService.uploadRequestImage(
-        requestId,
+      await this.facesService.uploadSessionSample(
+        sessionId,
         currentUser,
         file,
-        uploadFaceRegistrationImageDto,
+        body,
       ),
     );
   }
 
-  @Patch(':id/review')
+  @Post(':id/complete')
   @UseGuards(AuthGuard, RolesGuard)
-  @Roles('admin')
+  @Roles('student')
   @ApiOperation({
-    summary: 'Approve or reject a face registration request',
+    summary:
+      'Mark a face registration session as completed after collecting enough samples',
   })
   @ApiSuccessResponseDoc({
-    description: 'Face registration request reviewed successfully',
-    model: FaceRegistrationRequestResponseDto,
+    description: 'Face registration session completed successfully',
+    model: FaceRegistrationSessionResponseDto,
   })
-  @ApiForbiddenResponse({
-    description: 'Only administrators can review face registration requests',
-  })
-  async reviewRequest(
-    @Param('id', ParseIntPipe) requestId: number,
+  async completeSession(
+    @Param('id', ParseIntPipe) sessionId: number,
     @CurrentUser() currentUser: AuthenticatedUser,
-    @Body()
-    reviewFaceRegistrationRequestDto: ReviewFaceRegistrationRequestDto,
-  ): Promise<ApiSuccessResponse<FaceRegistrationRequestResponseDto>> {
+  ): Promise<ApiSuccessResponse<FaceRegistrationSessionResponseDto>> {
     return this.ok(
-      await this.facesService.reviewRequest(
-        requestId,
+      await this.facesService.completeSession(sessionId, currentUser),
+    );
+  }
+
+  @Post(':id/build-embeddings')
+  @UseGuards(AuthGuard, RolesGuard)
+  @Roles('student', 'admin')
+  @ApiOperation({
+    summary: 'Build embeddings for a completed face registration session',
+  })
+  @ApiSuccessResponseDoc({
+    description: 'Embeddings built successfully',
+    model: FaceRegistrationEmbeddingsBuildResponseDto,
+  })
+  async buildEmbeddings(
+    @Param('id', ParseIntPipe) sessionId: number,
+    @CurrentUser() currentUser: AuthenticatedUser,
+    @Body() body: BuildFaceRegistrationEmbeddingsDto,
+  ): Promise<ApiSuccessResponse<FaceRegistrationEmbeddingsBuildResponseDto>> {
+    return this.ok(
+      await this.facesService.buildEmbeddingsForSession(
+        sessionId,
         currentUser,
-        reviewFaceRegistrationRequestDto,
+        body,
       ),
     );
   }
