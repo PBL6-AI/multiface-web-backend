@@ -1,12 +1,19 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
-import { aiConfig, databaseConfig, envConfig, storageConfig } from './config';
+import {
+  aiConfig,
+  databaseConfig,
+  envConfig,
+  queueConfig,
+  storageConfig,
+} from './config';
 import { typeOrmConfig } from './database';
 import {
   AttendanceModule,
   AuthModule,
   ClassesModule,
+  EdgeDevicesModule,
   FacesModule,
   FilesModule,
   UsersModule,
@@ -16,7 +23,7 @@ import {
   imports: [
     ConfigModule.forRoot({
       isGlobal: true,
-      load: [envConfig, databaseConfig, storageConfig, aiConfig],
+      load: [envConfig, databaseConfig, storageConfig, aiConfig, queueConfig],
     }),
     TypeOrmModule.forRootAsync(typeOrmConfig),
     ClassesModule,
@@ -24,6 +31,7 @@ import {
     AuthModule,
     FilesModule,
     FacesModule,
+    EdgeDevicesModule,
     AttendanceModule,
   ],
   controllers: [],

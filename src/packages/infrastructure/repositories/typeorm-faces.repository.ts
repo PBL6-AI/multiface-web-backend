@@ -21,6 +21,7 @@ import {
   FaceEmbeddingEntity,
   FaceImageEntity,
   FaceRegistrationRequestEntity,
+  PrototypeEmbeddingEntity,
 } from '../entities';
 
 export class TypeOrmFacesRepository implements FacesRepository {
@@ -28,6 +29,7 @@ export class TypeOrmFacesRepository implements FacesRepository {
     private readonly faceRegistrationRequestsRepository: Repository<FaceRegistrationRequestEntity>,
     private readonly faceImagesRepository: Repository<FaceImageEntity>,
     private readonly faceEmbeddingsRepository: Repository<FaceEmbeddingEntity>,
+    private readonly prototypeEmbeddingsRepository: Repository<PrototypeEmbeddingEntity>,
   ) {}
 
   async findSessionById(
@@ -168,7 +170,8 @@ export class TypeOrmFacesRepository implements FacesRepository {
       inputs.map((input) =>
         this.faceEmbeddingsRepository.create({
           studentId: input.studentId,
-          faceImageId: input.faceImageId,
+          faceImageId: input.faceImageId ?? null,
+          enrollmentSessionId: input.enrollmentSessionId ?? null,
           embedding: input.embedding,
           modelName: input.modelName,
           modelVersion: input.modelVersion,
@@ -177,6 +180,10 @@ export class TypeOrmFacesRepository implements FacesRepository {
           isActive: input.isActive,
           preprocessProfile: input.preprocessProfile,
           isL2Normalized: input.isL2Normalized,
+          qualityScore: input.qualityScore ?? null,
+          yaw: input.yaw ?? null,
+          pitch: input.pitch ?? null,
+          roll: input.roll ?? null,
           metadata: input.metadata ?? null,
         }),
       ),
@@ -227,6 +234,36 @@ export class TypeOrmFacesRepository implements FacesRepository {
     }));
   }
 
+  async findClosestPrototypeCandidates(
+    embedding: number[],
+    limit: number = 10,
+  ): Promise<Array<{ studentId: number; similarity: number }>> {
+    const pgVectorArray = `[${embedding.join(',')}]`;
+    const results = await this.prototypeEmbeddingsRepository
+      .createQueryBuilder('prototype')
+      .select(['prototype.studentId AS "studentId"'])
+      .addSelect(
+        `1 - (prototype.embedding <=> '${pgVectorArray}')`,
+        'similarity',
+      )
+      .orderBy(`prototype.embedding <=> '${pgVectorArray}'`, 'ASC')
+      .limit(limit)
+      .getRawMany();
+
+    return results.map((row) => ({
+      studentId: Number(row.studentId),
+      similarity: Number(row.similarity),
+    }));
+  }
+
+  async findClosestEnrollmentEmbedding(
+    embedding: number[],
+    studentIds: number[],
+    limit: number = 1,
+  ): Promise<ClosestEmbeddingResult[]> {
+    return this.findClosestEmbedding(embedding, studentIds, limit);
+  }
+
   private readonly requestRelations = {
     student: {
       role: true,
@@ -259,15 +296,18 @@ export const useFacesRepository = () => ({
     faceRegistrationRequestsRepository: Repository<FaceRegistrationRequestEntity>,
     faceImagesRepository: Repository<FaceImageEntity>,
     faceEmbeddingsRepository: Repository<FaceEmbeddingEntity>,
+    prototypeEmbeddingsRepository: Repository<PrototypeEmbeddingEntity>,
   ) =>
     new TypeOrmFacesRepository(
       faceRegistrationRequestsRepository,
       faceImagesRepository,
       faceEmbeddingsRepository,
+      prototypeEmbeddingsRepository,
     ),
   inject: [
     getRepositoryToken(FaceRegistrationRequestEntity),
     getRepositoryToken(FaceImageEntity),
     getRepositoryToken(FaceEmbeddingEntity),
+    getRepositoryToken(PrototypeEmbeddingEntity),
   ],
 });

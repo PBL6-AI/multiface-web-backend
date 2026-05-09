@@ -113,6 +113,27 @@ export class AttendanceSessionResponseDto {
   })
   confidenceThreshold: number | null;
 
+  @ApiPropertyOptional({
+    description: 'Assigned edge device identifier',
+    example: 'pi-room-a-01',
+    nullable: true,
+  })
+  sourceDeviceId: string | null;
+
+  @ApiPropertyOptional({
+    description: 'Assigned camera identifier',
+    example: 'cam-imx519-01',
+    nullable: true,
+  })
+  cameraId: string | null;
+
+  @ApiPropertyOptional({
+    description: 'Video source configured for the edge pipeline',
+    example: 'libcamera://0',
+    nullable: true,
+  })
+  videoSource: string | null;
+
   @ApiProperty({
     description: 'Current session status',
     enum: AttendanceSessionStatus,
@@ -279,6 +300,61 @@ export class AttendanceSessionLiveSnapshotResponseDto {
     example: 0,
   })
   unknownFaceCount: number;
+
+  @ApiPropertyOptional({
+    description: 'Assigned edge device identifier',
+    example: 'pi-room-a-01',
+    nullable: true,
+  })
+  sourceDeviceId: string | null;
+
+  @ApiPropertyOptional({
+    description: 'Assigned camera identifier',
+    example: 'cam-imx519-01',
+    nullable: true,
+  })
+  cameraId: string | null;
+
+  @ApiPropertyOptional({
+    description: 'Resolved stream URL used by the remote AI pipeline',
+    example: 'rtsp://192.168.1.50:8554/class-a',
+    nullable: true,
+  })
+  videoSource: string | null;
+
+  @ApiPropertyOptional({
+    description: 'Current edge device online status',
+    example: 'online',
+    nullable: true,
+  })
+  edgeDeviceStatus: string | null;
+
+  @ApiPropertyOptional({
+    description: 'Latest heartbeat time received from the assigned edge device',
+    example: '2026-05-09T10:30:00.000Z',
+    nullable: true,
+  })
+  edgeLastHeartbeatAt: Date | null;
+
+  @ApiPropertyOptional({
+    description: 'Current stream runtime status reported by the edge device',
+    example: 'running',
+    nullable: true,
+  })
+  streamStatus: string | null;
+
+  @ApiProperty({
+    description:
+      'Whether the AI attendance pipeline is currently bound to this session',
+    example: true,
+  })
+  aiPipelineRunning: boolean;
+
+  @ApiPropertyOptional({
+    description: 'Realtime AI pipeline metrics when available',
+    nullable: true,
+  })
+  aiMetrics: Record<string, unknown> | null;
 
   @ApiProperty({
     description: 'Recent recognition events for live monitoring',

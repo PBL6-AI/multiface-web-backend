@@ -14,6 +14,7 @@ import {
   EDGEFACE_DEFAULT_PREPROCESS_PROFILE,
   EDGEFACE_EMBEDDING_DIMENSION,
 } from '../../../common/constants/ai-model.constants';
+import { EnrollmentSessionEntity } from './enrollment-session.entity';
 import { FaceImageEntity } from './face-image.entity';
 import { UserEntity } from './user.entity';
 
@@ -35,8 +36,11 @@ export class FaceEmbeddingEntity {
   @Column({ name: 'student_id', type: 'int' })
   studentId: number;
 
-  @Column({ name: 'face_image_id', type: 'int' })
-  faceImageId: number;
+  @Column({ name: 'face_image_id', type: 'int', nullable: true })
+  faceImageId: number | null;
+
+  @Column({ name: 'enrollment_session_id', type: 'int', nullable: true })
+  enrollmentSessionId: number | null;
 
   @Column({
     name: 'embedding',
@@ -93,6 +97,18 @@ export class FaceEmbeddingEntity {
   @Column({ name: 'metadata', type: 'jsonb', nullable: true })
   metadata: Record<string, unknown> | null;
 
+  @Column({ name: 'quality_score', type: 'float', nullable: true })
+  qualityScore: number | null;
+
+  @Column({ name: 'yaw', type: 'float', nullable: true })
+  yaw: number | null;
+
+  @Column({ name: 'pitch', type: 'float', nullable: true })
+  pitch: number | null;
+
+  @Column({ name: 'roll', type: 'float', nullable: true })
+  roll: number | null;
+
   @CreateDateColumn({ name: 'created_at', type: 'timestamp' })
   createdAt: Date;
 
@@ -104,7 +120,15 @@ export class FaceEmbeddingEntity {
 
   @ManyToOne(() => FaceImageEntity, (faceImage) => faceImage.embeddings, {
     onDelete: 'CASCADE',
+    nullable: true,
   })
   @JoinColumn({ name: 'face_image_id' })
-  faceImage: FaceImageEntity;
+  faceImage: FaceImageEntity | null;
+
+  @ManyToOne(() => EnrollmentSessionEntity, (session) => session.embeddings, {
+    onDelete: 'SET NULL',
+    nullable: true,
+  })
+  @JoinColumn({ name: 'enrollment_session_id' })
+  enrollmentSession: EnrollmentSessionEntity | null;
 }

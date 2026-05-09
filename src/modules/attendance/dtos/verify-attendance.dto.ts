@@ -1,7 +1,23 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { IsArray, IsDateString, IsNumber, IsString } from 'class-validator';
+import {
+  IsArray,
+  IsDateString,
+  IsNumber,
+  IsObject,
+  IsOptional,
+  IsString,
+  Max,
+  Min,
+} from 'class-validator';
 
 export class VerifyAttendanceRequestDto {
+  @ApiProperty({
+    description: 'Attendance session identifier to verify against',
+    example: 91,
+  })
+  @IsNumber()
+  sessionId: number;
+
   @ApiProperty({
     description: 'Face embedding vector from AI service',
     type: [Number],
@@ -17,6 +33,14 @@ export class VerifyAttendanceRequestDto {
   @IsString()
   cameraId: string;
 
+  @ApiPropertyOptional({
+    description: 'Edge device identifier that produced the request',
+    example: 'pi-room-a-01',
+  })
+  @IsOptional()
+  @IsString()
+  sourceDeviceId?: string;
+
   @ApiProperty({
     description: 'Track identifier from the tracker (e.g. SORT)',
     example: 42,
@@ -31,12 +55,29 @@ export class VerifyAttendanceRequestDto {
   @IsNumber()
   detectionScore: number;
 
+  @ApiPropertyOptional({
+    description: 'Anti-spoofing confidence score',
+    example: 0.98,
+  })
+  @IsOptional()
+  @IsNumber()
+  @Min(0)
+  @Max(1)
+  antiSpoofingScore?: number;
+
   @ApiProperty({
     description: 'Timestamp when the frame was processed',
     example: '2026-04-29T12:07:37.959Z',
   })
   @IsDateString()
   timestamp: string;
+
+  @ApiPropertyOptional({
+    description: 'Additional verification metadata from the edge pipeline',
+  })
+  @IsOptional()
+  @IsObject()
+  metadata?: Record<string, unknown>;
 }
 
 export class VerifyAttendanceResponseDto {

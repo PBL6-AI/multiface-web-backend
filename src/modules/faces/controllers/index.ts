@@ -1,1 +1,1 @@
-export * from './faces.controller';
+export * from './enrollment.controller';

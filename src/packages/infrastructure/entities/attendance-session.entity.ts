@@ -47,6 +47,25 @@ export class AttendanceSessionEntity {
   confidenceThreshold: number | null;
 
   @Column({
+    name: 'source_device_id',
+    type: 'varchar',
+    length: 120,
+    nullable: true,
+  })
+  sourceDeviceId: string | null;
+
+  @Column({ name: 'camera_id', type: 'varchar', length: 120, nullable: true })
+  cameraId: string | null;
+
+  @Column({
+    name: 'video_source',
+    type: 'varchar',
+    length: 255,
+    nullable: true,
+  })
+  videoSource: string | null;
+
+  @Column({
     name: 'status',
     type: 'enum',
     enum: AttendanceSessionStatus,

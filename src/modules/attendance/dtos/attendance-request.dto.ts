@@ -48,6 +48,30 @@ export class CreateAttendanceSessionDto {
   @Min(0)
   @Max(1)
   confidenceThreshold?: number;
+
+  @ApiPropertyOptional({
+    description: 'Identifier of the edge device assigned to this session',
+    example: 'pi-room-a-01',
+  })
+  @IsOptional()
+  @IsString()
+  sourceDeviceId?: string;
+
+  @ApiPropertyOptional({
+    description: 'Identifier of the camera used by the edge device',
+    example: 'cam-imx519-01',
+  })
+  @IsOptional()
+  @IsString()
+  cameraId?: string;
+
+  @ApiPropertyOptional({
+    description: 'Video source string used by the edge pipeline',
+    example: 'libcamera://0',
+  })
+  @IsOptional()
+  @IsString()
+  videoSource?: string;
 }
 
 export class IngestRecognitionEventDto {

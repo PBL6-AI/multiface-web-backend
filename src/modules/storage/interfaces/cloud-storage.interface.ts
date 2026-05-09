@@ -7,8 +7,16 @@ export type UploadBufferInput = {
   size: number;
 };
 
+export type SignedUploadInput = {
+  key: string;
+  contentType: string;
+  expiresInSeconds: number;
+};
+
 export interface CloudStorageService {
   uploadBuffer(input: UploadBufferInput): Promise<StoredObjectResult>;
   deleteObject(key: string): Promise<void>;
   getSignedObjectUrl(key: string, expiresInSeconds: number): Promise<string>;
+  getSignedUploadUrl(input: SignedUploadInput): Promise<string>;
+  objectExists(key: string): Promise<boolean>;
 }

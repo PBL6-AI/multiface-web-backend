@@ -17,6 +17,9 @@ export type CreateAttendanceSessionRecordInput = {
   endTime?: Date | null;
   attendanceType?: AttendanceType;
   confidenceThreshold?: number | null;
+  sourceDeviceId?: string | null;
+  cameraId?: string | null;
+  videoSource?: string | null;
   status?: AttendanceSessionStatus;
 };
 

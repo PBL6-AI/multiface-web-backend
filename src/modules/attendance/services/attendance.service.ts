@@ -28,6 +28,7 @@ import {
 import type { AuthenticatedUser } from '../../auth/interfaces';
 import { AI_PROVIDER_TOKEN } from '../../ai-integration/ai.constants';
 import type { FaceAiProvider } from '../../ai-integration/interfaces/face-ai-provider.interface';
+import { EdgeDevicesService } from '../../edge-devices';
 
 @Injectable()
 export class AttendanceService {
@@ -38,6 +39,7 @@ export class AttendanceService {
     private readonly facesRepository: FacesRepository,
     @Inject(AI_PROVIDER_TOKEN)
     private readonly faceAiProvider: FaceAiProvider,
+    private readonly edgeDevicesService: EdgeDevicesService,
   ) {}
 
   async createSession(
@@ -59,6 +61,12 @@ export class AttendanceService {
       );
     }
 
+    const edgeDevice = await this.edgeDevicesService.resolveForClass(
+      classEntity,
+      createAttendanceSessionDto.sourceDeviceId ?? null,
+      createAttendanceSessionDto.cameraId ?? null,
+    );
+
     const session = await this.attendanceRepository.createSession({
       classId: classEntity.id,
       createdById: currentUser.id,
@@ -69,19 +77,57 @@ export class AttendanceService {
         createAttendanceSessionDto.attendanceType ?? AttendanceType.AUTOMATIC,
       confidenceThreshold:
         createAttendanceSessionDto.confidenceThreshold ?? null,
+      sourceDeviceId: edgeDevice.deviceCode,
+      cameraId: edgeDevice.cameraId,
+      videoSource: createAttendanceSessionDto.videoSource ?? null,
       status: AttendanceSessionStatus.ACTIVE,
     });
 
-    // Notify AI service to start the video pipeline
+    let edgeRuntimeStarted = false;
     try {
-      await this.faceAiProvider.startAttendanceSession(session.id);
-    } catch (error) {
-      // We don't throw here to avoid failing session creation if AI service is down
-      // But we should probably log it
-      console.error('Failed to start AI pipeline:', error);
-    }
+      const edgeRuntime = await this.edgeDevicesService.startAttendanceOnDevice(
+        edgeDevice,
+        {
+          sessionId: session.id,
+          sourceDeviceId: edgeDevice.deviceCode,
+          cameraId: edgeDevice.cameraId,
+          roomCode: edgeDevice.roomCode,
+          metadata: {
+            classId: classEntity.id,
+            className: classEntity.className,
+          },
+        },
+      );
+      edgeRuntimeStarted = true;
 
-    return this.serializeSession(session);
+      session.videoSource = edgeRuntime.streamUrl;
+      const savedSession = await this.attendanceRepository.saveSession(session);
+
+      await this.faceAiProvider.startAttendanceSession({
+        sessionId: savedSession.id,
+        sourceDeviceId: savedSession.sourceDeviceId,
+        cameraId: savedSession.cameraId,
+        videoSource: savedSession.videoSource,
+        confidenceThreshold: savedSession.confidenceThreshold,
+      });
+
+      return await this.serializeSession(savedSession);
+    } catch (error) {
+      if (edgeRuntimeStarted) {
+        try {
+          await this.edgeDevicesService.stopAttendanceOnDevice(
+            edgeDevice,
+            session.id,
+          );
+        } catch (_edgeStopError) {
+          // Keep the original orchestration error as the main failure.
+        }
+      }
+      session.status = AttendanceSessionStatus.CLOSED;
+      session.endTime = new Date();
+      await this.attendanceRepository.saveSession(session);
+      throw error;
+    }
   }
 
   async listSessions(
@@ -90,10 +136,13 @@ export class AttendanceService {
   ) {
     const sessions = await this.attendanceRepository.listSessions();
 
-    return sessions
+    const visibleSessions = sessions
       .filter((session) => this.canAccessSession(currentUser, session))
-      .filter((session) => (status ? session.status === status : true))
-      .map((session) => this.serializeSession(session));
+      .filter((session) => (status ? session.status === status : true));
+
+    return Promise.all(
+      visibleSessions.map((session) => this.serializeSession(session)),
+    );
   }
 
   async getActiveSession(
@@ -142,6 +191,11 @@ export class AttendanceService {
         userCode: record.student.userCode,
       }));
 
+    const edgeStatus = session.sourceDeviceId
+      ? await this.loadEdgeSnapshot(session.sourceDeviceId, session.id)
+      : null;
+    const aiStatus = await this.faceAiProvider.getAttendanceStatus();
+
     return {
       sessionId: session.id,
       status: session.status,
@@ -150,7 +204,19 @@ export class AttendanceService {
       pendingCount:
         session.classEntity.classMembers.length - recognizedStudents.length,
       recognitionEventCount: session.recognitionEvents.length,
-      unknownFaceCount: session.unknownFaces?.length ?? 0,
+      unknownFaceCount: 0,
+      sourceDeviceId: session.sourceDeviceId,
+      cameraId: session.cameraId,
+      videoSource: session.videoSource,
+      edgeDeviceStatus: edgeStatus?.deviceStatus ?? null,
+      edgeLastHeartbeatAt: edgeStatus?.lastHeartbeatAt ?? null,
+      streamStatus: edgeStatus?.streamStatus ?? null,
+      aiPipelineRunning:
+        aiStatus.is_running && aiStatus.sessionId === session.id,
+      aiMetrics:
+        aiStatus.is_running && aiStatus.sessionId === session.id
+          ? (aiStatus.metrics ?? null)
+          : null,
       recentEvents: [...session.recognitionEvents]
         .sort(
           (left, right) => right.createdAt.getTime() - left.createdAt.getTime(),
@@ -179,8 +245,7 @@ export class AttendanceService {
       .sort(
         (left, right) => right.startTime.getTime() - left.startTime.getTime(),
       )
-      .slice(0, 5)
-      .map((session) => this.serializeSession(session));
+      .slice(0, 5);
 
     return {
       scope: currentUser.role,
@@ -209,7 +274,9 @@ export class AttendanceService {
         (total, session) => total + session.recognitionEvents.length,
         0,
       ),
-      recentSessions,
+      recentSessions: await Promise.all(
+        recentSessions.map((session) => this.serializeSession(session)),
+      ),
     };
   }
 
@@ -252,6 +319,12 @@ export class AttendanceService {
     // Notify AI service to stop the video pipeline
     try {
       await this.faceAiProvider.stopAttendanceSession(sessionId);
+      if (session.sourceDeviceId) {
+        const device = await this.edgeDevicesService.findEntityByCode(
+          session.sourceDeviceId,
+        );
+        await this.edgeDevicesService.stopAttendanceOnDevice(device, sessionId);
+      }
     } catch (error) {
       console.error('Failed to stop AI pipeline:', error);
     }
@@ -373,38 +446,75 @@ export class AttendanceService {
   async verifyAttendance(
     request: VerifyAttendanceRequestDto,
   ): Promise<VerifyAttendanceResponseDto> {
-    const activeSessions = (
-      await this.attendanceRepository.listSessions()
-    ).filter((s) => s.status === AttendanceSessionStatus.ACTIVE);
+    const session = await this.attendanceRepository.findSessionById(
+      request.sessionId,
+    );
 
-    if (activeSessions.length === 0) {
+    if (!session) {
       return {
         status: 'NO_MATCH',
-        message: 'No active attendance sessions found',
+        message: 'Attendance session not found',
       };
     }
 
-    // Collect all student IDs from active sessions
-    const studentToSessionMap = new Map<number, RawAttendanceSessionEntity>();
-    for (const session of activeSessions) {
-      for (const member of session.classEntity.classMembers) {
-        studentToSessionMap.set(member.studentId, session);
-      }
+    if (session.status !== AttendanceSessionStatus.ACTIVE) {
+      return {
+        status: 'NO_MATCH',
+        message: 'Attendance session is not active',
+      };
     }
 
-    const studentIds = Array.from(studentToSessionMap.keys());
+    if (session.cameraId && request.cameraId !== session.cameraId) {
+      return {
+        status: 'NO_MATCH',
+        message: `Camera ${request.cameraId} is not assigned to session ${session.id}`,
+      };
+    }
+
+    if (
+      session.sourceDeviceId &&
+      request.sourceDeviceId &&
+      request.sourceDeviceId !== session.sourceDeviceId
+    ) {
+      return {
+        status: 'NO_MATCH',
+        message: `Edge device ${request.sourceDeviceId} is not assigned to session ${session.id}`,
+      };
+    }
+
+    const studentIds = session.classEntity.classMembers.map(
+      (member) => member.studentId,
+    );
     if (studentIds.length === 0) {
       return {
         status: 'NO_MATCH',
-        message: 'No students found in active sessions',
+        message: 'No students found in this attendance session',
       };
     }
 
-    const closestMatches = await this.facesRepository.findClosestEmbedding(
-      request.embedding,
-      studentIds,
-      1,
-    );
+    const prototypeCandidates =
+      await this.facesRepository.findClosestPrototypeCandidates(
+        request.embedding,
+        10,
+      );
+
+    if (!prototypeCandidates.length) {
+      return {
+        status: 'NO_MATCH',
+        message: 'No enrollment prototype embeddings found',
+      };
+    }
+
+    const candidateStudentIds = prototypeCandidates
+      .map((candidate) => candidate.studentId)
+      .filter((studentId) => studentIds.includes(studentId));
+
+    const closestMatches =
+      await this.facesRepository.findClosestEnrollmentEmbedding(
+        request.embedding,
+        candidateStudentIds,
+        1,
+      );
 
     if (!closestMatches.length) {
       return {
@@ -414,15 +524,6 @@ export class AttendanceService {
     }
 
     const match = closestMatches[0];
-    const session = studentToSessionMap.get(match.studentId);
-
-    if (!session) {
-      return {
-        status: 'NO_MATCH',
-        message: 'Internal error: mapped session not found',
-      };
-    }
-
     const threshold = session.confidenceThreshold ?? 0.8;
     if (match.similarity < threshold) {
       return {
@@ -435,13 +536,16 @@ export class AttendanceService {
     // Attempt to register the attendance using the ingest event logic
     try {
       const ingestDto: IngestRecognitionEventDto = {
-        sourceDeviceId: request.cameraId,
+        sourceDeviceId:
+          request.sourceDeviceId ?? session.sourceDeviceId ?? request.cameraId,
         frameId: `track-${request.trackId}-${Date.now()}`,
         candidateUserId: match.studentId,
         matchedEmbeddingId: match.embeddingId,
         confidenceScore: request.detectionScore,
         similarityScore: match.similarity,
         isRealFace: true,
+        antiSpoofingScore: request.antiSpoofingScore ?? null,
+        metadata: request.metadata,
       };
 
       const result = await this.ingestRecognitionEvent(session.id, ingestDto);
@@ -476,7 +580,7 @@ export class AttendanceService {
     if (!event.isRealFace) {
       return {
         attendanceRecordId: null,
-        decision: 'ignored',
+        decision: 'FAKE_FACE_REJECTED',
         reason:
           'Recognition event ignored because anti-spoofing flagged a fake face',
       };
@@ -485,7 +589,7 @@ export class AttendanceService {
     if (event.candidateUserId == null) {
       return {
         attendanceRecordId: null,
-        decision: 'ignored',
+        decision: 'NO_MATCH',
         reason:
           'Recognition event ignored because no candidate user was returned',
       };
@@ -498,7 +602,7 @@ export class AttendanceService {
     if (!isMember) {
       return {
         attendanceRecordId: null,
-        decision: 'rejected',
+        decision: 'NOT_CLASS_MEMBER',
         reason: 'Recognized user is not a member of this class',
       };
     }
@@ -509,7 +613,7 @@ export class AttendanceService {
     if (confidenceScore < sessionThreshold) {
       return {
         attendanceRecordId: null,
-        decision: 'rejected',
+        decision: 'LOW_SIMILARITY',
         reason:
           'Recognition event confidence is below the configured session threshold',
       };
@@ -530,7 +634,7 @@ export class AttendanceService {
 
       return {
         attendanceRecordId: savedRecord.id,
-        decision: 'attendance_updated',
+        decision: 'MATCH_ALREADY_PRESENT',
         reason:
           'Recognition event accepted and the existing attendance record was updated',
       };
@@ -548,12 +652,12 @@ export class AttendanceService {
 
     return {
       attendanceRecordId: createdRecord.id,
-      decision: 'attendance_marked',
+      decision: 'MATCH_ATTENDANCE_MARKED',
       reason: 'Recognition event accepted and attendance recorded',
     };
   }
 
-  private serializeSession(session: RawAttendanceSessionEntity) {
+  private async serializeSession(session: RawAttendanceSessionEntity) {
     const presentCount = session.records.filter(
       (record) => record.status === AttendanceRecordStatus.PRESENT,
     ).length;
@@ -567,6 +671,9 @@ export class AttendanceService {
       endTime: session.endTime,
       attendanceType: session.attendanceType,
       confidenceThreshold: session.confidenceThreshold,
+      sourceDeviceId: session.sourceDeviceId,
+      cameraId: session.cameraId,
+      videoSource: session.videoSource,
       status: session.status,
       classMemberCount: session.classEntity.classMembers.length,
       recognitionEventCount: session.recognitionEvents.length,
@@ -581,6 +688,38 @@ export class AttendanceService {
         fullName: record.student.fullName,
         userCode: record.student.userCode,
       })),
+    };
+  }
+
+  private async loadEdgeSnapshot(sourceDeviceId: string, sessionId: number) {
+    let device;
+    try {
+      device = await this.edgeDevicesService.findEntityByCode(sourceDeviceId);
+    } catch (_error) {
+      return {
+        deviceStatus: 'missing',
+        lastHeartbeatAt: null,
+        streamStatus: 'unregistered',
+      };
+    }
+    let runtimeStatus: Record<string, unknown> | null = null;
+
+    try {
+      runtimeStatus =
+        await this.edgeDevicesService.getDeviceRuntimeStatus(device);
+    } catch (_error) {
+      runtimeStatus = null;
+    }
+
+    return {
+      deviceStatus: device.status,
+      lastHeartbeatAt: device.lastHeartbeatAt,
+      streamStatus:
+        runtimeStatus && runtimeStatus['sessionId'] === sessionId
+          ? String(runtimeStatus['status'] ?? 'running')
+          : runtimeStatus
+            ? 'idle'
+            : 'unreachable',
     };
   }
 

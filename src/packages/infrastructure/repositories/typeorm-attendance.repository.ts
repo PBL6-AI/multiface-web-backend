@@ -37,6 +37,9 @@ export class TypeOrmAttendanceRepository implements AttendanceRepository {
         endTime: input.endTime ?? null,
         attendanceType: input.attendanceType,
         confidenceThreshold: input.confidenceThreshold ?? null,
+        sourceDeviceId: input.sourceDeviceId ?? null,
+        cameraId: input.cameraId ?? null,
+        videoSource: input.videoSource ?? null,
         status: input.status,
       }),
     );
@@ -89,6 +92,7 @@ export class TypeOrmAttendanceRepository implements AttendanceRepository {
         teacher: {
           role: true,
         },
+        schedules: true,
         classMembers: {
           student: {
             role: true,

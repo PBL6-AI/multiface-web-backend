@@ -43,7 +43,8 @@ export type ListFaceRegistrationRequestsOptions = {
 
 export type CreateFaceEmbeddingRecordInput = {
   studentId: number;
-  faceImageId: number;
+  faceImageId?: number | null;
+  enrollmentSessionId?: number | null;
   embedding: number[];
   modelName: string;
   modelVersion: string;
@@ -52,6 +53,10 @@ export type CreateFaceEmbeddingRecordInput = {
   isActive: boolean;
   preprocessProfile: string;
   isL2Normalized: boolean;
+  qualityScore?: number | null;
+  yaw?: number | null;
+  pitch?: number | null;
+  roll?: number | null;
   metadata?: Record<string, unknown> | null;
 };
 
@@ -92,6 +97,15 @@ export interface FacesRepository {
   ): Promise<RawFaceEmbeddingEntity[]>;
   deleteEmbeddingsByFaceImageIds(faceImageIds: number[]): Promise<void>;
   findClosestEmbedding(
+    embedding: number[],
+    studentIds: number[],
+    limit?: number,
+  ): Promise<ClosestEmbeddingResult[]>;
+  findClosestPrototypeCandidates(
+    embedding: number[],
+    limit?: number,
+  ): Promise<Array<{ studentId: number; similarity: number }>>;
+  findClosestEnrollmentEmbedding(
     embedding: number[],
     studentIds: number[],
     limit?: number,

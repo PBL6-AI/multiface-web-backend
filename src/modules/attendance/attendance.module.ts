@@ -14,6 +14,7 @@ import { AttendanceService, AttendanceMonitorService } from './services';
 import { UsersModule } from '../users';
 import { FacesModule } from '../faces';
 import { AiIntegrationModule } from '../ai-integration';
+import { EdgeDevicesModule } from '../edge-devices';
 
 @Module({
   imports: [
@@ -21,6 +22,7 @@ import { AiIntegrationModule } from '../ai-integration';
     AuthModule,
     FacesModule,
     AiIntegrationModule,
+    EdgeDevicesModule,
     TypeOrmModule.forFeature([
       AttendanceSessionEntity,
       AttendanceRecordEntity,

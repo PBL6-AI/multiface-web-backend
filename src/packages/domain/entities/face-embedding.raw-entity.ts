@@ -4,7 +4,8 @@ import type { RawUserEntity } from './user.raw-entity';
 export interface RawFaceEmbeddingEntity {
   id: number;
   studentId: number;
-  faceImageId: number;
+  faceImageId: number | null;
+  enrollmentSessionId: number | null;
   embedding: number[];
   modelName: string;
   modelVersion: string;
@@ -14,7 +15,11 @@ export interface RawFaceEmbeddingEntity {
   preprocessProfile: string;
   isL2Normalized: boolean;
   metadata: Record<string, unknown> | null;
+  qualityScore: number | null;
+  yaw: number | null;
+  pitch: number | null;
+  roll: number | null;
   createdAt: Date;
   student: RawUserEntity;
-  faceImage: RawFaceImageEntity;
+  faceImage: RawFaceImageEntity | null;
 }

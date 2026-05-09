@@ -6,11 +6,15 @@ import {
 import type { ConfigType } from '@nestjs/config';
 import aiConfig from '../../../config/ai.config';
 import type {
+  AttendancePipelineStatus,
   FaceAiProvider,
   GenerateFaceEmbeddingsInput,
   GenerateFaceEmbeddingsResult,
+  ProcessEnrollmentVideoInput,
+  ProcessEnrollmentVideoResult,
   RecognizeFaceInput,
   RecognizeFaceResult,
+  StartAttendanceSessionInput,
 } from '../interfaces/face-ai-provider.interface';
 
 @Injectable()
@@ -29,22 +33,30 @@ export class HttpFaceAiProvider implements FaceAiProvider {
     );
   }
 
+  async processEnrollmentVideo(
+    input: ProcessEnrollmentVideoInput,
+  ): Promise<ProcessEnrollmentVideoResult> {
+    return this.post<ProcessEnrollmentVideoResult>(
+      '/enrollment/process',
+      input,
+    );
+  }
+
   async recognizeFace(input: RecognizeFaceInput): Promise<RecognizeFaceResult> {
     return this.post<RecognizeFaceResult>('/recognition/infer', input);
   }
 
-  async startAttendanceSession(sessionId: number): Promise<void> {
-    await this.post('/attendance/start', { sessionId });
+  async startAttendanceSession(
+    input: StartAttendanceSessionInput,
+  ): Promise<void> {
+    await this.post('/attendance/start', input);
   }
 
   async stopAttendanceSession(sessionId: number): Promise<void> {
     await this.post('/attendance/stop', { sessionId });
   }
 
-  async getAttendanceStatus(): Promise<{
-    is_running: boolean;
-    source: string | null;
-  }> {
+  async getAttendanceStatus(): Promise<AttendancePipelineStatus> {
     const abortController = new AbortController();
     const timeoutHandle = setTimeout(
       () => abortController.abort(),
@@ -67,10 +79,7 @@ export class HttpFaceAiProvider implements FaceAiProvider {
         return { is_running: false, source: null };
       }
 
-      return (await response.json()) as {
-        is_running: boolean;
-        source: string | null;
-      };
+      return (await response.json()) as AttendancePipelineStatus;
     } catch (_error) {
       return { is_running: false, source: null };
     } finally {
@@ -81,6 +90,7 @@ export class HttpFaceAiProvider implements FaceAiProvider {
   private async post<TResponse>(
     path: string,
     payload: unknown,
+    baseUrl = this.config.baseUrl,
   ): Promise<TResponse> {
     const abortController = new AbortController();
     const timeoutHandle = setTimeout(
@@ -89,7 +99,7 @@ export class HttpFaceAiProvider implements FaceAiProvider {
     );
 
     try {
-      const response = await fetch(`${this.config.baseUrl}${path}`, {
+      const response = await fetch(`${baseUrl}${path}`, {
         method: 'POST',
         headers: {
           'content-type': 'application/json',
@@ -102,8 +112,10 @@ export class HttpFaceAiProvider implements FaceAiProvider {
       });
 
       if (!response.ok) {
+        const responseBody = await response.text();
         throw new InternalServerErrorException(
-          `AI service request failed with status ${response.status}`,
+          responseBody ||
+            `AI service request failed with status ${response.status}`,
         );
       }
 

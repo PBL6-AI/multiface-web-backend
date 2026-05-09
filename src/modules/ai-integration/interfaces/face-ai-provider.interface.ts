@@ -28,6 +28,37 @@ export type GenerateFaceEmbeddingsResult = {
   embeddings: GeneratedFaceEmbedding[];
 };
 
+export type ProcessEnrollmentVideoInput = {
+  sessionId: number;
+  studentId: number;
+  videoObjectKey: string;
+  requestedAt: string;
+  videoUrl?: string;
+};
+
+export type EnrollmentEmbeddingResult = {
+  embedding: number[];
+  qualityScore: number | null;
+  yaw: number | null;
+  pitch: number | null;
+  roll: number | null;
+  frameIndex: number;
+  modelName: string;
+  modelVersion: string;
+};
+
+export type ProcessEnrollmentVideoResult = {
+  acceptedFrameCount: number;
+  rejectedFrameStats: Record<string, number>;
+  embeddings: EnrollmentEmbeddingResult[];
+  prototypeEmbedding: number[];
+  prototypeModelName: string;
+  prototypeModelVersion: string;
+  processingStats: Record<string, unknown>;
+  thresholdsUsed: Record<string, unknown>;
+  qualitySummary: Record<string, unknown> | null;
+};
+
 export type RecognizeFaceInput = {
   sessionId: number;
   sourceDeviceId: string;
@@ -56,15 +87,32 @@ export type RecognizeFaceResult = {
   metadata?: Record<string, unknown> | null;
 };
 
+export type StartAttendanceSessionInput = {
+  sessionId: number;
+  sourceDeviceId?: string | null;
+  cameraId?: string | null;
+  videoSource?: string | null;
+  confidenceThreshold?: number | null;
+};
+
+export type AttendancePipelineStatus = {
+  is_running: boolean;
+  source: string | null;
+  sessionId?: number | null;
+  sourceDeviceId?: string | null;
+  cameraId?: string | null;
+  metrics?: Record<string, unknown> | null;
+};
+
 export interface FaceAiProvider {
   generateFaceEmbeddings(
     input: GenerateFaceEmbeddingsInput,
   ): Promise<GenerateFaceEmbeddingsResult>;
+  processEnrollmentVideo(
+    input: ProcessEnrollmentVideoInput,
+  ): Promise<ProcessEnrollmentVideoResult>;
   recognizeFace(input: RecognizeFaceInput): Promise<RecognizeFaceResult>;
-  startAttendanceSession(sessionId: number): Promise<void>;
+  startAttendanceSession(input: StartAttendanceSessionInput): Promise<void>;
   stopAttendanceSession(sessionId: number): Promise<void>;
-  getAttendanceStatus(): Promise<{
-    is_running: boolean;
-    source: string | null;
-  }>;
+  getAttendanceStatus(): Promise<AttendancePipelineStatus>;
 }

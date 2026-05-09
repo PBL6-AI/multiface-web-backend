@@ -26,6 +26,13 @@ type StoreUploadedFileInput = {
   checksum?: string | null;
 };
 
+type CreatePresignedVideoUploadInput = {
+  studentId: number;
+  sessionId: number;
+  filename: string;
+  mimeType: string;
+};
+
 @Injectable()
 export class FilesService {
   private static readonly ALLOWED_AVATAR_MIME_TYPES = new Set([
@@ -36,6 +43,12 @@ export class FilesService {
   ]);
 
   private static readonly MAX_AVATAR_SIZE_BYTES = 5 * 1024 * 1024;
+  private static readonly ALLOWED_ENROLLMENT_VIDEO_MIME_TYPES = new Set([
+    'video/mp4',
+    'video/webm',
+    'video/quicktime',
+  ]);
+  private static readonly MAX_ENROLLMENT_VIDEO_SIZE_BYTES = 50 * 1024 * 1024;
 
   constructor(
     private readonly configService: ConfigService,
@@ -102,6 +115,36 @@ export class FilesService {
     };
   }
 
+  async createPresignedEnrollmentVideoUpload(
+    input: CreatePresignedVideoUploadInput,
+  ) {
+    this.ensureEnrollmentVideoIsValid({
+      filename: input.filename,
+      mimetype: input.mimeType,
+    });
+
+    const objectKey = `face-enrollment/videos/${input.studentId}/${input.sessionId}-${this.sanitizeFileName(input.filename)}`;
+    const uploadUrl = await this.cloudStorageService.getSignedUploadUrl({
+      key: objectKey,
+      contentType: input.mimeType,
+      expiresInSeconds: this.getSignedUrlTtlSeconds(),
+    });
+
+    return {
+      objectKey,
+      uploadUrl,
+      expiresInSeconds: this.getSignedUrlTtlSeconds(),
+    };
+  }
+
+  async buildSignedObjectUrl(objectKey: string): Promise<string> {
+    return this.buildSignedFileUrl(objectKey);
+  }
+
+  async objectExists(objectKey: string): Promise<boolean> {
+    return this.cloudStorageService.objectExists(objectKey);
+  }
+
   ensureAvatarImageIsValid(file: UploadableFile): void {
     if (!FilesService.ALLOWED_AVATAR_MIME_TYPES.has(file.mimetype)) {
       throw new BadRequestException('Avatar must be a JPG, PNG, or WEBP image');
@@ -109,6 +152,25 @@ export class FilesService {
 
     if (file.size > FilesService.MAX_AVATAR_SIZE_BYTES) {
       throw new BadRequestException('Avatar image must not exceed 5MB');
+    }
+  }
+
+  ensureEnrollmentVideoPayloadIsValid(input: {
+    filename: string;
+    mimeType: string;
+    size: number;
+  }): void {
+    this.ensureEnrollmentVideoIsValid({
+      filename: input.filename,
+      mimetype: input.mimeType,
+    });
+
+    if (input.size <= 0) {
+      throw new BadRequestException('Enrollment video must not be empty');
+    }
+
+    if (input.size > FilesService.MAX_ENROLLMENT_VIDEO_SIZE_BYTES) {
+      throw new BadRequestException('Enrollment video must not exceed 50MB');
     }
   }
 
@@ -168,5 +230,23 @@ export class FilesService {
     }
 
     return Math.floor(ttlFromConfig);
+  }
+
+  private ensureEnrollmentVideoIsValid(input: {
+    filename: string;
+    mimetype: string;
+  }): void {
+    if (!FilesService.ALLOWED_ENROLLMENT_VIDEO_MIME_TYPES.has(input.mimetype)) {
+      throw new BadRequestException(
+        'Enrollment video must be MP4, WEBM, or MOV',
+      );
+    }
+
+    const extension = extname(input.filename).toLowerCase();
+    if (!['.mp4', '.webm', '.mov', '.m4v'].includes(extension)) {
+      throw new BadRequestException(
+        'Enrollment video file extension is not supported',
+      );
+    }
   }
 }
