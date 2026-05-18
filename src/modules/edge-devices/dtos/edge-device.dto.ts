@@ -29,7 +29,11 @@ export class RegisterEdgeDeviceDto {
   controlBaseUrl: string;
 
   @ApiProperty({ example: 'rtsp://192.168.1.50:8554' })
-  @IsUrl({ require_tld: false, require_protocol: true })
+  @IsUrl({
+    require_tld: false,
+    require_protocol: true,
+    protocols: ['http', 'https', 'rtsp', 'rtmp', 'ws', 'wss'],
+  })
   streamBaseUrl: string;
 
   @ApiPropertyOptional()
