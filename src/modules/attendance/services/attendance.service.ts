@@ -4,6 +4,7 @@ import {
   ForbiddenException,
   Inject,
   Injectable,
+  Logger,
   NotFoundException,
 } from '@nestjs/common';
 import { REPOSITORY_TOKENS } from '../../../common/constants';
@@ -32,6 +33,8 @@ import { EdgeDevicesService } from '../../edge-devices';
 
 @Injectable()
 export class AttendanceService {
+  private readonly logger = new Logger(AttendanceService.name);
+
   constructor(
     @Inject(REPOSITORY_TOKENS.ATTENDANCE)
     private readonly attendanceRepository: AttendanceRepository,
@@ -495,19 +498,29 @@ export class AttendanceService {
     const prototypeCandidates =
       await this.facesRepository.findClosestPrototypeCandidates(
         request.embedding,
+        studentIds,
         10,
       );
 
-    if (!prototypeCandidates.length) {
-      return {
-        status: 'NO_MATCH',
-        message: 'No enrollment prototype embeddings found',
-      };
-    }
+    this.logger.debug(
+      `verifyAttendance session=${session.id} prototypes=${prototypeCandidates
+        .slice(0, 3)
+        .map(
+          (candidate) =>
+            `${candidate.studentId}:${candidate.similarity.toFixed(4)}`,
+        )
+        .join(', ')}`,
+    );
 
-    const candidateStudentIds = prototypeCandidates
-      .map((candidate) => candidate.studentId)
-      .filter((studentId) => studentIds.includes(studentId));
+    const candidateStudentIds = prototypeCandidates.length
+      ? prototypeCandidates.map((candidate) => candidate.studentId)
+      : studentIds;
+
+    if (!prototypeCandidates.length) {
+      this.logger.warn(
+        `verifyAttendance session=${session.id} found no class prototype candidates; falling back to ${studentIds.length} active enrollment students`,
+      );
+    }
 
     const closestMatches =
       await this.facesRepository.findClosestEnrollmentEmbedding(
@@ -525,7 +538,13 @@ export class AttendanceService {
 
     const match = closestMatches[0];
     const threshold = session.confidenceThreshold ?? 0.8;
+    this.logger.debug(
+      `verifyAttendance session=${session.id} bestEmbedding student=${match.studentId} embedding=${match.embeddingId} similarity=${match.similarity.toFixed(4)} threshold=${threshold}`,
+    );
     if (match.similarity < threshold) {
+      this.logger.log(
+        `verifyAttendance NO_MATCH session=${session.id} track=${request.trackId} similarity=${match.similarity.toFixed(4)} threshold=${threshold}`,
+      );
       return {
         status: 'NO_MATCH',
         similarity: match.similarity,
@@ -541,11 +560,15 @@ export class AttendanceService {
         frameId: `track-${request.trackId}-${Date.now()}`,
         candidateUserId: match.studentId,
         matchedEmbeddingId: match.embeddingId,
-        confidenceScore: request.detectionScore,
+        confidenceScore: match.similarity,
         similarityScore: match.similarity,
         isRealFace: true,
         antiSpoofingScore: request.antiSpoofingScore ?? null,
-        metadata: request.metadata,
+        metadata: {
+          ...(request.metadata ?? {}),
+          detectionScore: request.detectionScore,
+          matchThreshold: threshold,
+        },
       };
 
       const result = await this.ingestRecognitionEvent(session.id, ingestDto);
@@ -608,7 +631,7 @@ export class AttendanceService {
     }
 
     const sessionThreshold = session.confidenceThreshold ?? 0.8;
-    const confidenceScore = event.confidenceScore ?? event.similarityScore ?? 0;
+    const confidenceScore = event.similarityScore ?? event.confidenceScore ?? 0;
 
     if (confidenceScore < sessionThreshold) {
       return {
