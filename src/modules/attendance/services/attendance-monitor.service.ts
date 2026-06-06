@@ -5,7 +5,6 @@ import {
   OnModuleDestroy,
   OnModuleInit,
 } from '@nestjs/common';
-import { AttendanceSessionStatus } from '../../../common/domain/enums';
 import { REPOSITORY_TOKENS } from '../../../common/constants';
 import type { AttendanceRepository } from '../../../packages/domain';
 import { AI_PROVIDER_TOKEN } from '../../ai-integration/ai.constants';
@@ -36,10 +35,8 @@ export class AttendanceMonitorService implements OnModuleInit, OnModuleDestroy {
 
   private async checkActiveSessions() {
     try {
-      const sessions = await this.attendanceRepository.listSessions();
-      const activeSessions = sessions.filter(
-        (s) => s.status === AttendanceSessionStatus.ACTIVE,
-      );
+      const activeSessions =
+        await this.attendanceRepository.listActiveSessionsForMonitor();
 
       if (activeSessions.length === 0) {
         return;

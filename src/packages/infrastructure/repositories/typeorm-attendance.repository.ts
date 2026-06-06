@@ -1,7 +1,9 @@
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { REPOSITORY_TOKENS } from '../../../common/constants';
+import { AttendanceSessionStatus } from '../../../common/domain/enums';
 import type {
+  ActiveAttendanceSessionMonitorRecord,
   AttendanceRepository,
   CreateAttendanceRecordRecordInput,
   CreateAttendanceSessionRecordInput,
@@ -65,6 +67,27 @@ export class TypeOrmAttendanceRepository implements AttendanceRepository {
   async listSessions(): Promise<RawAttendanceSessionEntity[]> {
     return this.attendanceSessionsRepository.find({
       relations: this.sessionRelations,
+      order: {
+        startTime: 'DESC',
+      },
+    });
+  }
+
+  async listActiveSessionsForMonitor(): Promise<
+    ActiveAttendanceSessionMonitorRecord[]
+  > {
+    return this.attendanceSessionsRepository.find({
+      select: {
+        id: true,
+        sourceDeviceId: true,
+        cameraId: true,
+        videoSource: true,
+        confidenceThreshold: true,
+        status: true,
+      },
+      where: {
+        status: AttendanceSessionStatus.ACTIVE,
+      },
       order: {
         startTime: 'DESC',
       },
