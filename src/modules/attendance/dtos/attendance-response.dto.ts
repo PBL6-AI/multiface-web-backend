@@ -323,6 +323,13 @@ export class AttendanceSessionLiveSnapshotResponseDto {
   videoSource: string | null;
 
   @ApiPropertyOptional({
+    description: 'WebRTC preview URL used by the frontend live monitor',
+    example: 'http://192.168.1.50:8889/pi-room-a-01/session-91/',
+    nullable: true,
+  })
+  previewUrl: string | null;
+
+  @ApiPropertyOptional({
     description: 'Current edge device online status',
     example: 'online',
     nullable: true,

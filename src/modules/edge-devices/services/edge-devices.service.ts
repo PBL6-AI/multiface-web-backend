@@ -20,6 +20,7 @@ type EdgeStartPayload = {
 type EdgeStartResponse = {
   status: string;
   streamUrl: string;
+  previewUrl?: string | null;
   cameraId: string;
   sessionId: number;
 };

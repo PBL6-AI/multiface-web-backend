@@ -213,6 +213,7 @@ export class AttendanceService {
       sourceDeviceId: session.sourceDeviceId,
       cameraId: session.cameraId,
       videoSource: session.videoSource,
+      previewUrl: edgeStatus?.previewUrl ?? null,
       edgeDeviceStatus: edgeStatus?.deviceStatus ?? null,
       edgeLastHeartbeatAt: edgeStatus?.lastHeartbeatAt ?? null,
       streamStatus: edgeStatus?.streamStatus ?? null,
@@ -711,6 +712,12 @@ export class AttendanceService {
     return {
       deviceStatus: device.status,
       lastHeartbeatAt: device.lastHeartbeatAt,
+      previewUrl:
+        runtimeStatus && typeof runtimeStatus['previewUrl'] === 'string'
+          ? runtimeStatus['previewUrl']
+          : typeof device.metadata?.previewUrl === 'string'
+            ? device.metadata.previewUrl
+            : null,
       streamStatus:
         runtimeStatus && runtimeStatus['sessionId'] === sessionId
           ? String(runtimeStatus['status'] ?? 'running')
