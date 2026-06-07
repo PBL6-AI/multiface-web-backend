@@ -30,6 +30,8 @@ import { AI_PROVIDER_TOKEN } from '../../ai-integration/ai.constants';
 import type { FaceAiProvider } from '../../ai-integration/interfaces/face-ai-provider.interface';
 import { EdgeDevicesService } from '../../edge-devices';
 
+const DEFAULT_ATTENDANCE_CONFIDENCE_THRESHOLD = 0.65;
+
 @Injectable()
 export class AttendanceService {
   constructor(
@@ -492,27 +494,10 @@ export class AttendanceService {
       };
     }
 
-    const prototypeCandidates =
-      await this.facesRepository.findClosestPrototypeCandidates(
-        request.embedding,
-        10,
-      );
-
-    if (!prototypeCandidates.length) {
-      return {
-        status: 'NO_MATCH',
-        message: 'No enrollment prototype embeddings found',
-      };
-    }
-
-    const candidateStudentIds = prototypeCandidates
-      .map((candidate) => candidate.studentId)
-      .filter((studentId) => studentIds.includes(studentId));
-
     const closestMatches =
       await this.facesRepository.findClosestEnrollmentEmbedding(
         request.embedding,
-        candidateStudentIds,
+        studentIds,
         1,
       );
 
@@ -524,7 +509,8 @@ export class AttendanceService {
     }
 
     const match = closestMatches[0];
-    const threshold = session.confidenceThreshold ?? 0.8;
+    const threshold =
+      session.confidenceThreshold ?? DEFAULT_ATTENDANCE_CONFIDENCE_THRESHOLD;
     if (match.similarity < threshold) {
       return {
         status: 'NO_MATCH',
@@ -607,8 +593,9 @@ export class AttendanceService {
       };
     }
 
-    const sessionThreshold = session.confidenceThreshold ?? 0.8;
-    const confidenceScore = event.confidenceScore ?? event.similarityScore ?? 0;
+    const sessionThreshold =
+      session.confidenceThreshold ?? DEFAULT_ATTENDANCE_CONFIDENCE_THRESHOLD;
+    const confidenceScore = event.similarityScore ?? event.confidenceScore ?? 0;
 
     if (confidenceScore < sessionThreshold) {
       return {
