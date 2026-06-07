@@ -33,6 +33,13 @@ type CreatePresignedVideoUploadInput = {
   mimeType: string;
 };
 
+type UploadEnrollmentVideoBufferInput = {
+  objectKey: string;
+  filename: string;
+  mimeType: string;
+  buffer: Buffer;
+};
+
 @Injectable()
 export class FilesService {
   private static readonly ALLOWED_AVATAR_MIME_TYPES = new Set([
@@ -139,6 +146,23 @@ export class FilesService {
 
   async buildSignedObjectUrl(objectKey: string): Promise<string> {
     return this.buildSignedFileUrl(objectKey);
+  }
+
+  async uploadEnrollmentVideoBuffer(
+    input: UploadEnrollmentVideoBufferInput,
+  ): Promise<void> {
+    this.ensureEnrollmentVideoPayloadIsValid({
+      filename: input.filename,
+      mimeType: input.mimeType,
+      size: input.buffer.length,
+    });
+
+    await this.cloudStorageService.uploadBuffer({
+      key: input.objectKey,
+      body: input.buffer,
+      contentType: input.mimeType,
+      size: input.buffer.length,
+    });
   }
 
   async objectExists(objectKey: string): Promise<boolean> {

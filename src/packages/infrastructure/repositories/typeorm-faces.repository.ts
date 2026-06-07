@@ -236,8 +236,13 @@ export class TypeOrmFacesRepository implements FacesRepository {
 
   async findClosestPrototypeCandidates(
     embedding: number[],
+    studentIds: number[],
     limit: number = 10,
   ): Promise<Array<{ studentId: number; similarity: number }>> {
+    if (!studentIds.length) {
+      return [];
+    }
+
     const pgVectorArray = `[${embedding.join(',')}]`;
     const results = await this.prototypeEmbeddingsRepository
       .createQueryBuilder('prototype')
@@ -246,6 +251,7 @@ export class TypeOrmFacesRepository implements FacesRepository {
         `1 - (prototype.embedding <=> '${pgVectorArray}')`,
         'similarity',
       )
+      .where('prototype.studentId IN (:...studentIds)', { studentIds })
       .orderBy(`prototype.embedding <=> '${pgVectorArray}'`, 'ASC')
       .limit(limit)
       .getRawMany();

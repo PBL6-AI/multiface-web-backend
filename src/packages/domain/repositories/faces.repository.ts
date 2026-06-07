@@ -103,6 +103,7 @@ export interface FacesRepository {
   ): Promise<ClosestEmbeddingResult[]>;
   findClosestPrototypeCandidates(
     embedding: number[],
+    studentIds: number[],
     limit?: number,
   ): Promise<Array<{ studentId: number; similarity: number }>>;
   findClosestEnrollmentEmbedding(

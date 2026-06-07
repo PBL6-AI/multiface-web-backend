@@ -24,9 +24,28 @@ type EdgeStartResponse = {
   sessionId: number;
 };
 
+type EdgePreviewResponse = {
+  status: string;
+  streamUrl?: string | null;
+  previewUrl?: string | null;
+  streamPath?: string | null;
+  cameraId: string;
+};
+
+type EdgeRecordingResponse = {
+  status: string;
+  isRecording: boolean;
+  recordingId: string;
+  filePath: string;
+  fileName: string;
+  source: string;
+  startedAt?: string | null;
+};
+
 @Injectable()
 export class EdgeDevicesService {
   private readonly edgeTimeoutMs = 15000;
+  private readonly recordingDownloadTimeoutMs = 60_000;
   private readonly onlineWindowMs = 90_000;
 
   constructor(
@@ -96,6 +115,23 @@ export class EdgeDevicesService {
     return this.serialize(device);
   }
 
+  async listEnrollmentDevices() {
+    const devices = await this.edgeDevicesRepository.find({
+      order: {
+        roomCode: 'ASC',
+        deviceCode: 'ASC',
+      },
+    });
+
+    return devices.map((device) => ({
+      deviceCode: device.deviceCode,
+      deviceName: device.deviceName,
+      roomCode: device.roomCode,
+      cameraId: device.cameraId,
+      status: this.isRecentlyOnline(device) ? 'online' : device.status,
+    }));
+  }
+
   async findEntityByCode(deviceCode: string) {
     const device = await this.edgeDevicesRepository.findOne({
       where: { deviceCode },
@@ -162,6 +198,33 @@ export class EdgeDevicesService {
     return onlineCandidates[0];
   }
 
+  async resolveForEnrollment(
+    requestedSourceDeviceId?: string | null,
+  ): Promise<EdgeDeviceEntity> {
+    if (requestedSourceDeviceId) {
+      const device = await this.findEntityByCode(requestedSourceDeviceId);
+      this.ensureOnline(device);
+      return device;
+    }
+
+    const devices = await this.edgeDevicesRepository.find({
+      order: {
+        updatedAt: 'DESC',
+      },
+    });
+    const onlineDevices = devices.filter((device) =>
+      this.isRecentlyOnline(device),
+    );
+
+    if (onlineDevices.length !== 1) {
+      throw new BadRequestException(
+        'Unable to auto-select an edge device. Please select one online Arducam device.',
+      );
+    }
+
+    return onlineDevices[0];
+  }
+
   async startAttendanceOnDevice(
     device: EdgeDeviceEntity,
     payload: EdgeStartPayload,
@@ -181,6 +244,81 @@ export class EdgeDevicesService {
       '/attendance/stop',
       { sessionId },
     );
+  }
+
+  async startEnrollmentPreviewOnDevice(
+    device: EdgeDeviceEntity,
+  ): Promise<EdgePreviewResponse> {
+    return this.post<EdgePreviewResponse>(
+      device.controlBaseUrl,
+      '/preview/start',
+      {
+        streamPath: `${device.deviceCode}/enrollment-preview`,
+      },
+    );
+  }
+
+  async stopEnrollmentPreviewOnDevice(device: EdgeDeviceEntity) {
+    return this.post<Record<string, unknown>>(
+      device.controlBaseUrl,
+      '/preview/stop',
+      {},
+    );
+  }
+
+  async startEnrollmentRecordingOnDevice(
+    device: EdgeDeviceEntity,
+    recordingId: string,
+    fileName: string,
+  ): Promise<EdgeRecordingResponse> {
+    return this.post<EdgeRecordingResponse>(
+      device.controlBaseUrl,
+      '/recording/start',
+      { recordingId, fileName },
+    );
+  }
+
+  async stopEnrollmentRecordingOnDevice(
+    device: EdgeDeviceEntity,
+    recordingId: string,
+  ): Promise<EdgeRecordingResponse> {
+    return this.post<EdgeRecordingResponse>(
+      device.controlBaseUrl,
+      '/recording/end',
+      { recordingId },
+    );
+  }
+
+  async downloadRecordingFromDevice(
+    device: EdgeDeviceEntity,
+    fileName: string,
+  ): Promise<Buffer> {
+    const abortController = new AbortController();
+    const timeout = setTimeout(
+      () => abortController.abort(),
+      this.recordingDownloadTimeoutMs,
+    );
+
+    try {
+      const response = await fetch(
+        `${device.controlBaseUrl}/recording/files/${encodeURIComponent(fileName)}`,
+        {
+          method: 'GET',
+          signal: abortController.signal,
+        },
+      );
+
+      if (!response.ok) {
+        const body = await response.text();
+        throw new BadRequestException(
+          body || `Recording download failed with status ${response.status}`,
+        );
+      }
+
+      return Buffer.from(await response.arrayBuffer());
+    } finally {
+      clearTimeout(timeout);
+    }
   }
 
   async getDeviceRuntimeStatus(device: EdgeDeviceEntity) {
@@ -220,7 +358,9 @@ export class EdgeDevicesService {
   }
 
   private isRecentlyOnline(device: EdgeDeviceEntity) {
-    if (device.status !== 'online') {
+    if (
+      !['online', 'running', 'recording', 'previewing'].includes(device.status)
+    ) {
       return false;
     }
 

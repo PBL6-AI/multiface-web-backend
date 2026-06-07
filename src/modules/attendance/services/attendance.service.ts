@@ -4,6 +4,7 @@ import {
   ForbiddenException,
   Inject,
   Injectable,
+  Logger,
   NotFoundException,
 } from '@nestjs/common';
 import { REPOSITORY_TOKENS } from '../../../common/constants';
@@ -34,6 +35,8 @@ const DEFAULT_ATTENDANCE_CONFIDENCE_THRESHOLD = 0.65;
 
 @Injectable()
 export class AttendanceService {
+  private readonly logger = new Logger(AttendanceService.name);
+
   constructor(
     @Inject(REPOSITORY_TOKENS.ATTENDANCE)
     private readonly attendanceRepository: AttendanceRepository,
@@ -512,6 +515,9 @@ export class AttendanceService {
     const threshold =
       session.confidenceThreshold ?? DEFAULT_ATTENDANCE_CONFIDENCE_THRESHOLD;
     if (match.similarity < threshold) {
+      this.logger.log(
+        `verifyAttendance NO_MATCH session=${session.id} track=${request.trackId} similarity=${match.similarity.toFixed(4)} threshold=${threshold}`,
+      );
       return {
         status: 'NO_MATCH',
         similarity: match.similarity,
@@ -527,11 +533,15 @@ export class AttendanceService {
         frameId: `track-${request.trackId}-${Date.now()}`,
         candidateUserId: match.studentId,
         matchedEmbeddingId: match.embeddingId,
-        confidenceScore: request.detectionScore,
+        confidenceScore: match.similarity,
         similarityScore: match.similarity,
         isRealFace: true,
         antiSpoofingScore: request.antiSpoofingScore ?? null,
-        metadata: request.metadata,
+        metadata: {
+          ...(request.metadata ?? {}),
+          detectionScore: request.detectionScore,
+          matchThreshold: threshold,
+        },
       };
 
       const result = await this.ingestRecognitionEvent(session.id, ingestDto);

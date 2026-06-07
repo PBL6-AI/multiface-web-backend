@@ -53,6 +53,16 @@ export type CreateAttendanceRecordRecordInput = {
   recognitionEventId?: number | null;
 };
 
+export type ActiveAttendanceSessionMonitorRecord = Pick<
+  RawAttendanceSessionEntity,
+  | 'id'
+  | 'sourceDeviceId'
+  | 'cameraId'
+  | 'videoSource'
+  | 'confidenceThreshold'
+  | 'status'
+>;
+
 export interface AttendanceRepository {
   createSession(
     input: CreateAttendanceSessionRecordInput,
@@ -61,6 +71,9 @@ export interface AttendanceRepository {
     sessionId: number,
   ): Promise<RawAttendanceSessionEntity | null>;
   listSessions(): Promise<RawAttendanceSessionEntity[]>;
+  listActiveSessionsForMonitor(): Promise<
+    ActiveAttendanceSessionMonitorRecord[]
+  >;
   saveSession(
     session: RawAttendanceSessionEntity,
   ): Promise<RawAttendanceSessionEntity>;

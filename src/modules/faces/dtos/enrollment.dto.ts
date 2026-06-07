@@ -1,5 +1,12 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { IsInt, IsNotEmpty, IsPositive, IsString, Max } from 'class-validator';
+import {
+  IsInt,
+  IsNotEmpty,
+  IsOptional,
+  IsPositive,
+  IsString,
+  Max,
+} from 'class-validator';
 import { EnrollmentSessionStatus } from '../../../common/domain/enums';
 
 export class CreateEnrollmentSessionDto {
@@ -25,6 +32,66 @@ export class CompleteEnrollmentSessionDto {
   @IsInt()
   @IsPositive()
   sessionId: number;
+}
+
+export class StartEdgeEnrollmentPreviewDto {
+  @ApiPropertyOptional({ example: 'pi-room-a-01' })
+  @IsOptional()
+  @IsString()
+  deviceCode?: string;
+}
+
+export class StartEdgeEnrollmentRecordingDto {
+  @ApiPropertyOptional({ example: 'pi-room-a-01' })
+  @IsOptional()
+  @IsString()
+  deviceCode?: string;
+}
+
+export class CompleteEdgeEnrollmentRecordingDto {
+  @ApiProperty({ example: 101 })
+  @IsInt()
+  @IsPositive()
+  sessionId: number;
+
+  @ApiPropertyOptional({ example: 'pi-room-a-01' })
+  @IsOptional()
+  @IsString()
+  deviceCode?: string;
+}
+
+export class EdgeEnrollmentDeviceDto {
+  @ApiProperty()
+  deviceCode: string;
+
+  @ApiProperty()
+  deviceName: string;
+
+  @ApiProperty()
+  roomCode: string;
+
+  @ApiProperty()
+  cameraId: string;
+
+  @ApiProperty()
+  status: string;
+}
+
+export class EdgeEnrollmentPreviewResponseDto {
+  @ApiProperty()
+  deviceCode: string;
+
+  @ApiProperty()
+  cameraId: string;
+
+  @ApiPropertyOptional({ nullable: true })
+  streamUrl: string | null;
+
+  @ApiPropertyOptional({ nullable: true })
+  previewUrl: string | null;
+
+  @ApiProperty()
+  status: string;
 }
 
 export class EnrollmentVideoUploadDto {
@@ -101,4 +168,21 @@ export class EnrollmentSessionResponseDto {
 
   @ApiProperty()
   updatedAt: Date;
+}
+
+export class EdgeEnrollmentRecordingResponseDto {
+  @ApiProperty({ type: () => EnrollmentSessionResponseDto })
+  session: EnrollmentSessionResponseDto;
+
+  @ApiProperty()
+  deviceCode: string;
+
+  @ApiProperty()
+  cameraId: string;
+
+  @ApiProperty()
+  recordingId: string;
+
+  @ApiPropertyOptional({ nullable: true })
+  previewUrl: string | null;
 }

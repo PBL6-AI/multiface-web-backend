@@ -12,6 +12,7 @@ import {
 } from '../../packages/infrastructure/entities';
 import { useFacesRepository } from '../../packages/infrastructure/repositories';
 import { AiIntegrationModule } from '../ai-integration';
+import { EdgeDevicesModule } from '../edge-devices';
 import { FilesModule } from '../files';
 import { EnrollmentController } from './controllers';
 import {
@@ -25,6 +26,7 @@ import { UsersModule } from '../users';
   imports: [
     ConfigModule.forFeature(queueConfig),
     AiIntegrationModule,
+    EdgeDevicesModule,
     UsersModule,
     FilesModule,
     TypeOrmModule.forFeature([

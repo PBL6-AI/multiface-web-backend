@@ -12,10 +12,14 @@ import {
   PrototypeEmbeddingEntity,
 } from '../../../packages/infrastructure/entities';
 import type { AuthenticatedUser } from '../../auth/interfaces';
+import { EdgeDevicesService } from '../../edge-devices';
 import { FilesService } from '../../files/services';
 import type {
+  CompleteEdgeEnrollmentRecordingDto,
   CompleteEnrollmentSessionDto,
   CreateEnrollmentSessionDto,
+  StartEdgeEnrollmentPreviewDto,
+  StartEdgeEnrollmentRecordingDto,
   EnrollmentSessionResponseDto,
 } from '../dtos';
 import { EnrollmentQueueService } from './enrollment-queue.service';
@@ -29,6 +33,7 @@ export class EnrollmentService {
     private readonly prototypeEmbeddingsRepository: Repository<PrototypeEmbeddingEntity>,
     private readonly filesService: FilesService,
     private readonly enrollmentQueueService: EnrollmentQueueService,
+    private readonly edgeDevicesService: EdgeDevicesService,
   ) {}
 
   async createSession(
@@ -123,6 +128,195 @@ export class EnrollmentService {
 
     session.status = EnrollmentSessionStatus.UPLOADED;
     session.failureReason = null;
+    await this.enrollmentSessionsRepository.save(session);
+
+    const job = await this.enrollmentQueueService.enqueueEnrollmentProcessing({
+      sessionId: session.id,
+      studentId: session.studentId,
+      videoObjectKey: session.videoObjectKey,
+      requestedAt: new Date().toISOString(),
+    });
+
+    session.status = EnrollmentSessionStatus.QUEUED;
+    session.jobId = job.id ? String(job.id) : null;
+    const savedSession = await this.enrollmentSessionsRepository.save(session);
+
+    return this.serializeSession(savedSession);
+  }
+
+  async listEdgeEnrollmentDevices() {
+    return this.edgeDevicesService.listEnrollmentDevices();
+  }
+
+  async startEdgePreview(dto: StartEdgeEnrollmentPreviewDto) {
+    const device = await this.edgeDevicesService.resolveForEnrollment(
+      dto.deviceCode,
+    );
+    const preview =
+      await this.edgeDevicesService.startEnrollmentPreviewOnDevice(device);
+
+    return {
+      deviceCode: device.deviceCode,
+      cameraId: preview.cameraId ?? device.cameraId,
+      streamUrl: preview.streamUrl ?? null,
+      previewUrl: preview.previewUrl ?? null,
+      status: preview.status,
+    };
+  }
+
+  async stopEdgePreview(dto: StartEdgeEnrollmentPreviewDto) {
+    const device = await this.edgeDevicesService.resolveForEnrollment(
+      dto.deviceCode,
+    );
+    return this.edgeDevicesService.stopEnrollmentPreviewOnDevice(device);
+  }
+
+  async startEdgeRecording(
+    currentUser: AuthenticatedUser,
+    dto: StartEdgeEnrollmentRecordingDto,
+  ) {
+    const lockInfo = await this.resolveRegistrationLockInfo(currentUser.id);
+    if (lockInfo.locked) {
+      throw new ConflictException(
+        lockInfo.reason ??
+          'Face enrollment is already completed for this student',
+      );
+    }
+
+    const activeProcessingSession =
+      await this.enrollmentSessionsRepository.findOne({
+        where: {
+          studentId: currentUser.id,
+          status: In([
+            EnrollmentSessionStatus.CREATED,
+            EnrollmentSessionStatus.UPLOADING,
+            EnrollmentSessionStatus.UPLOADED,
+            EnrollmentSessionStatus.QUEUED,
+            EnrollmentSessionStatus.PROCESSING,
+          ]),
+        },
+        order: { createdAt: 'DESC' },
+      });
+
+    if (activeProcessingSession) {
+      throw new ConflictException(
+        'A face enrollment session is already in progress for this student',
+      );
+    }
+
+    const device = await this.edgeDevicesService.resolveForEnrollment(
+      dto.deviceCode,
+    );
+    const draftSession = await this.enrollmentSessionsRepository.save(
+      this.enrollmentSessionsRepository.create({
+        studentId: currentUser.id,
+        videoObjectKey: 'pending',
+        videoFilename: 'pending.mp4',
+        videoMimeType: 'video/mp4',
+        videoSize: null,
+        status: EnrollmentSessionStatus.CREATED,
+        metadata: {
+          source: 'edge_camera_enrollment',
+          sourceDeviceId: device.deviceCode,
+          cameraId: device.cameraId,
+        },
+      }),
+    );
+
+    const recordingId = `enrollment-${draftSession.id}`;
+    const fileName = `${recordingId}.mp4`;
+    const objectKey = `face-enrollment/videos/${currentUser.id}/${draftSession.id}-${fileName}`;
+    const recording =
+      await this.edgeDevicesService.startEnrollmentRecordingOnDevice(
+        device,
+        recordingId,
+        fileName,
+      );
+
+    draftSession.videoObjectKey = objectKey;
+    draftSession.videoFilename = fileName;
+    draftSession.status = EnrollmentSessionStatus.UPLOADING;
+    draftSession.metadata = {
+      ...(draftSession.metadata ?? {}),
+      recordingId: recording.recordingId,
+      recordingFileName: recording.fileName,
+      recordingSource: recording.source,
+      recordingStartedAt: recording.startedAt ?? null,
+    };
+    const savedSession =
+      await this.enrollmentSessionsRepository.save(draftSession);
+
+    return {
+      session: await this.serializeSession(savedSession),
+      deviceCode: device.deviceCode,
+      cameraId: device.cameraId,
+      recordingId: recording.recordingId,
+      previewUrl:
+        typeof device.metadata?.previewUrl === 'string'
+          ? device.metadata.previewUrl
+          : null,
+    };
+  }
+
+  async completeEdgeRecording(
+    currentUser: AuthenticatedUser,
+    dto: CompleteEdgeEnrollmentRecordingDto,
+  ) {
+    const session = await this.findSessionOrThrow(dto.sessionId);
+    this.ensureCanAccessSession(currentUser, session);
+
+    if (session.studentId !== currentUser.id) {
+      throw new ForbiddenException(
+        'You can only complete your own enrollment session',
+      );
+    }
+
+    if (session.status !== EnrollmentSessionStatus.UPLOADING) {
+      throw new ConflictException(
+        'This edge enrollment session is not currently recording',
+      );
+    }
+
+    const deviceCode =
+      dto.deviceCode ??
+      (typeof session.metadata?.sourceDeviceId === 'string'
+        ? session.metadata.sourceDeviceId
+        : undefined);
+    const device =
+      await this.edgeDevicesService.resolveForEnrollment(deviceCode);
+    const recordingId =
+      typeof session.metadata?.recordingId === 'string'
+        ? session.metadata.recordingId
+        : `enrollment-${session.id}`;
+
+    const stopped =
+      await this.edgeDevicesService.stopEnrollmentRecordingOnDevice(
+        device,
+        recordingId,
+      );
+    const fileName = stopped.fileName || session.videoFilename;
+    const videoBuffer =
+      await this.edgeDevicesService.downloadRecordingFromDevice(
+        device,
+        fileName,
+      );
+
+    await this.filesService.uploadEnrollmentVideoBuffer({
+      objectKey: session.videoObjectKey,
+      filename: session.videoFilename,
+      mimeType: session.videoMimeType,
+      buffer: videoBuffer,
+    });
+
+    session.videoSize = videoBuffer.length;
+    session.status = EnrollmentSessionStatus.UPLOADED;
+    session.failureReason = null;
+    session.metadata = {
+      ...(session.metadata ?? {}),
+      recordingStoppedAt: new Date().toISOString(),
+      recordingFileName: fileName,
+      recordingFileSize: videoBuffer.length,
+    };
     await this.enrollmentSessionsRepository.save(session);
 
     const job = await this.enrollmentQueueService.enqueueEnrollmentProcessing({
