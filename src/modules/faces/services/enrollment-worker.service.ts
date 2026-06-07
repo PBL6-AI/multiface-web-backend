@@ -124,6 +124,12 @@ export class EnrollmentProcessingWorkerService {
       session.processingCompletedAt = new Date();
       session.failureReason =
         error instanceof Error ? error.message : 'Enrollment processing failed';
+      session.processingSummary = {
+        failureReason: session.failureReason,
+        videoObjectKey: session.videoObjectKey,
+        videoFilename: session.videoFilename,
+        videoSize: session.videoSize,
+      };
       await this.enrollmentSessionsRepository.save(session);
       throw error;
     }
