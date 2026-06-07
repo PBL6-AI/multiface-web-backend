@@ -31,6 +31,8 @@ import { AI_PROVIDER_TOKEN } from '../../ai-integration/ai.constants';
 import type { FaceAiProvider } from '../../ai-integration/interfaces/face-ai-provider.interface';
 import { EdgeDevicesService } from '../../edge-devices';
 
+const DEFAULT_ATTENDANCE_CONFIDENCE_THRESHOLD = 0.65;
+
 @Injectable()
 export class AttendanceService {
   private readonly logger = new Logger(AttendanceService.name);
@@ -495,37 +497,10 @@ export class AttendanceService {
       };
     }
 
-    const prototypeCandidates =
-      await this.facesRepository.findClosestPrototypeCandidates(
-        request.embedding,
-        studentIds,
-        10,
-      );
-
-    this.logger.debug(
-      `verifyAttendance session=${session.id} prototypes=${prototypeCandidates
-        .slice(0, 3)
-        .map(
-          (candidate) =>
-            `${candidate.studentId}:${candidate.similarity.toFixed(4)}`,
-        )
-        .join(', ')}`,
-    );
-
-    const candidateStudentIds = prototypeCandidates.length
-      ? prototypeCandidates.map((candidate) => candidate.studentId)
-      : studentIds;
-
-    if (!prototypeCandidates.length) {
-      this.logger.warn(
-        `verifyAttendance session=${session.id} found no class prototype candidates; falling back to ${studentIds.length} active enrollment students`,
-      );
-    }
-
     const closestMatches =
       await this.facesRepository.findClosestEnrollmentEmbedding(
         request.embedding,
-        candidateStudentIds,
+        studentIds,
         1,
       );
 
@@ -537,10 +512,8 @@ export class AttendanceService {
     }
 
     const match = closestMatches[0];
-    const threshold = session.confidenceThreshold ?? 0.8;
-    this.logger.debug(
-      `verifyAttendance session=${session.id} bestEmbedding student=${match.studentId} embedding=${match.embeddingId} similarity=${match.similarity.toFixed(4)} threshold=${threshold}`,
-    );
+    const threshold =
+      session.confidenceThreshold ?? DEFAULT_ATTENDANCE_CONFIDENCE_THRESHOLD;
     if (match.similarity < threshold) {
       this.logger.log(
         `verifyAttendance NO_MATCH session=${session.id} track=${request.trackId} similarity=${match.similarity.toFixed(4)} threshold=${threshold}`,
@@ -630,7 +603,8 @@ export class AttendanceService {
       };
     }
 
-    const sessionThreshold = session.confidenceThreshold ?? 0.8;
+    const sessionThreshold =
+      session.confidenceThreshold ?? DEFAULT_ATTENDANCE_CONFIDENCE_THRESHOLD;
     const confidenceScore = event.similarityScore ?? event.confidenceScore ?? 0;
 
     if (confidenceScore < sessionThreshold) {
