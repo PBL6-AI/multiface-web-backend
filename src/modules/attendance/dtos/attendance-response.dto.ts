@@ -4,6 +4,7 @@ import {
   AttendanceSessionStatus,
   AttendanceType,
 } from '../../../common/domain/enums';
+import type { FaceBoundingBox } from '../../../common/types';
 
 export class AttendanceRecordResponseDto {
   @ApiProperty({
@@ -243,6 +244,13 @@ export class AttendanceSessionLiveEventResponseDto {
     nullable: true,
   })
   similarityScore: number | null;
+
+  @ApiPropertyOptional({
+    description: 'Face bounding box in the processed frame',
+    example: { x: 120, y: 80, width: 160, height: 160 },
+    nullable: true,
+  })
+  boundingBox: FaceBoundingBox | null;
 
   @ApiProperty({
     description: 'Whether the face was considered real by anti-spoofing',

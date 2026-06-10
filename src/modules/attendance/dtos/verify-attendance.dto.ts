@@ -73,6 +73,14 @@ export class VerifyAttendanceRequestDto {
   timestamp: string;
 
   @ApiPropertyOptional({
+    description: 'Face bounding box in the processed frame',
+    example: { x: 120, y: 80, width: 160, height: 160 },
+  })
+  @IsOptional()
+  @IsObject()
+  boundingBox?: Record<string, unknown> | null;
+
+  @ApiPropertyOptional({
     description: 'Additional verification metadata from the edge pipeline',
   })
   @IsOptional()

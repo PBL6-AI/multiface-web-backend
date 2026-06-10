@@ -235,6 +235,7 @@ export class AttendanceService {
           detectedStudentName: event.detectedStudent?.fullName ?? null,
           confidenceScore: event.confidenceScore,
           similarityScore: event.similarityScore,
+          boundingBox: event.boundingBox,
           isRealFace: event.isRealFace,
           createdAt: event.createdAt,
         })),
@@ -538,6 +539,7 @@ export class AttendanceService {
         similarityScore: match.similarity,
         isRealFace: true,
         antiSpoofingScore: request.antiSpoofingScore ?? null,
+        boundingBox: request.boundingBox ?? null,
         metadata: {
           ...(request.metadata ?? {}),
           detectionScore: request.detectionScore,
